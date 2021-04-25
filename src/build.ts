@@ -1,5 +1,6 @@
 import {
   fromJs,
+  isNil,
   mapObject,
   resolve,
   resolveType,
@@ -41,6 +42,31 @@ const pushableDeep = (create, initial) => {
 
 const nilValue = { type: "value", value: "" };
 
+const buildFunc = ({ body, arg }, create, getVar) => {
+  if (!arg) return { type: "default", value: build(body, create, getVar) };
+  const paramDefaults =
+    Array.isArray(arg) &&
+    arg.map((x) => (x.def ? build(x.def, create, getVar) : nilValue));
+  return {
+    type: typeof arg === "string" ? "func" : arg.result ? "reduce" : "map",
+    body: body,
+    buildGetVar: (value, key, result) => (name) => {
+      if (typeof arg === "string") return name === arg ? value : getVar(name);
+      if (Array.isArray(arg)) {
+        if (value.type === "value") return nilValue;
+        const index = arg.findIndex((x) => x.key === name);
+        return index !== -1
+          ? value.content[index] || paramDefaults[index]
+          : getVar(name);
+      }
+      if (name === arg.value) return value;
+      if (name === arg.key) return { type: "value", value: key };
+      if (name === arg.result) return result;
+      return getVar(name);
+    },
+  };
+};
+
 const build = (node, create, getVar) => {
   if (typeof node === "function") {
     return { type: "stream", value: create(node) };
@@ -56,53 +82,29 @@ const build = (node, create, getVar) => {
       return getVar(name);
     };
     for (const name of Object.keys(node.values)) newGetVar(name);
-    const content = node.content.map((c) => build(c, create, newGetVar));
-    const paramDefaults =
-      Array.isArray(node.func?.arg) &&
-      node.func.arg.map((x) =>
-        x.def ? build(x.def, create, newGetVar) : { type: "value", value: "" }
-      );
-    const func = node.func && {
-      body: node.func.body,
-      type:
-        Object.prototype.toString.call(node.func.arg) === "[object Object]"
-          ? node.func.arg.result
-            ? "reduce"
-            : "map"
-          : "func",
-      buildGetVar: (value, key, result) => (name) => {
-        if (typeof node.func.arg === "string") {
-          return name === node.func.arg ? value : newGetVar(name);
-        }
-        if (Array.isArray(node.func.arg)) {
-          if (value.type === "value") return { type: "value", value: "" };
-          const index = node.func.arg.findIndex((x) => x.key === name);
-          return index !== -1
-            ? value.content[index] || paramDefaults[index]
-            : newGetVar(name);
-        }
-        return name === node.func.arg.value
-          ? value
-          : name === node.func.arg.key
-          ? { type: "value", value: key }
-          : name === node.func.arg.result
-          ? result
-          : newGetVar(name);
-      },
-    };
+    const content = node.content.map((c) =>
+      Array.isArray(c)
+        ? [build(c[0], create, newGetVar)]
+        : build(c, create, newGetVar)
+    );
+    const func = node.func && buildFunc(node.func, create, getVar);
     if (node.bracket === "<") {
       return { type: "block", values, content, func };
     }
     return {
       type: "stream",
       value: create((set, get) => () => {
-        let v = { type: "value", value: "" };
-        for (const c of content) {
+        let v = nilValue;
+        const unpacked = content.reduce((res, x) => {
+          if (!Array.isArray(x)) return [...res, x];
+          const v = resolveType(x[0], get);
+          return v.type === "block" ? [...res, ...v.content] : res;
+        }, []);
+        for (const c of unpacked) {
           v = resolveType(c, get);
-          if ((v.type === "value" && !v.value) === (node.bracket === "[")) {
-            break;
-          }
+          if (isNil(v) === (node.bracket === "[")) break;
         }
+        if (isNil(v) && func?.type === "default") v = func.value;
         set(v);
       }),
     };
@@ -138,10 +140,7 @@ const build = (node, create, getVar) => {
         let emit;
         return () => {
           const newEmit = resolve(args[0], get);
-          if (
-            emit !== newEmit &&
-            !(newEmit.type === "value" && !newEmit.value)
-          ) {
+          if (emit !== newEmit && !isNil(newEmit)) {
             set({ ...resolve(args[1], (x) => get(x, true)) });
           }
           emit = newEmit;

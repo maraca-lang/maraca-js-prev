@@ -10,7 +10,15 @@ import render from "./render";
 // const script = `(<(a b=20)=>(@a + @b)>.<10>)`;
 // const script = `(<v=>>(@v + 1)>.1)`;
 // const script = `(<res=>v=>>(@res + @v)>.<1 2 3>)`;
-const script = `<1 =<2 3 4>>`;
+// const script = `<1 a=1 =<2 3 4 b=2>>`;
+
+const script = `
+<div
+  hover=""
+  style=<color=[@hover red =>green]>
+  "hello <span style=<"font-weight"=bold> 1> world!"
+>
+`;
 
 const library = {
   tick: (set) => {
@@ -24,13 +32,12 @@ const library = {
   },
 };
 
-// const root = document.createElement("div");
-// document.body.appendChild(root);
-// maraca(script, library, render(root));
+const root = document.createElement("div");
+document.body.appendChild(root);
+maraca(script, library, render(root));
 
-maraca(script, library, (data) => {
-  console.log(JSON.stringify(data, null, 2));
-});
+// maraca(script, library, (data) => {
+//   console.log(JSON.stringify(data, null, 2));
+// });
 
 // operators
-// unpack

@@ -21,6 +21,8 @@ export const toIndex = (v: string) => {
   return n !== null && n === Math.floor(n) && n > 0 ? n : null;
 };
 
+export const isNil = (d) => d.type === "value" && !d.value;
+
 export const fromJs = (value) => {
   if (value === 0) return { type: "value", value: "0" };
   if (!value) return { type: "value", value: "" };
@@ -50,7 +52,7 @@ export const toJs = (data = { type: "value", value: "" } as any, config) => {
   if (typeof config === "function") {
     return { value: toJs(data, config()), push: data.push };
   }
-  if (data.type === "value" && !data.value) return undefined;
+  if (isNil(data)) return undefined;
   if (config === "boolean") return true;
   if (Array.isArray(config) && config.length > 1) {
     for (const c of config) {
@@ -102,6 +104,17 @@ const nilValue = { type: "value", value: "" };
 export const resolveType = (data, get) => {
   const d = data || nilValue;
   if (d.type === "stream") return resolveType(get(d.value), get);
+  if (d.type === "block") {
+    let values = {};
+    const content = d.content.reduce((res, x) => {
+      if (!Array.isArray(x)) return [...res, x];
+      const v = resolveType(x[0], get);
+      if (v.type !== "block") return res;
+      values = { ...values, ...v.values };
+      return [...res, ...v.content];
+    }, []);
+    return { ...d, values: { ...values, ...d.values }, content };
+  }
   return d;
 };
 

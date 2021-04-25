@@ -20,14 +20,14 @@ const grammar = `Maraca {
     | content
   
   attr
-    = text "=" value
+    = text? "=" value
 
   func
     = text "=>" text "=>" text "=>" value -- reduce_keys
     | text "=>" text "=>>" value -- reduce
     | text "=>" text "=>" value -- map_keys
     | text "=>>" value -- map
-    | param "=>" value -- func
+    | param? "=>" value -- func
   
   param
     = "(" space* (paramitem space*)* ")" -- block
@@ -118,7 +118,8 @@ s.addAttribute("ast", {
 
   item: (a) => a.ast,
 
-  attr: (a, _1, b) => ({ type: "attr", key: a.ast.value, value: b.ast }),
+  attr: (a, _1, b) =>
+    a.ast[0] ? { type: "attr", key: a.ast[0].value, value: b.ast } : [[b.ast]],
 
   func_reduce_keys: (a, _1, b, _2, c, _3, d) => ({
     type: "func",
@@ -144,7 +145,7 @@ s.addAttribute("ast", {
     body: b.ast,
   }),
 
-  func_func: (a, _1, b) => ({ type: "func", arg: a.ast, body: b.ast }),
+  func_func: (a, _1, b) => ({ type: "func", arg: a.ast[0], body: b.ast }),
 
   param_block: (_1, _2, b, _3, _4) => b.ast,
 
@@ -193,7 +194,8 @@ s.addAttribute("ast", {
 
   stringchar: (a) => ({ type: "value", value: a.sourceString }),
 
-  multi: (_1, a, _2) => a.ast,
+  multi: (_1, a, _2) =>
+    a.ast.length === 0 ? [{ type: "value", value: "" }] : a.ast,
 
   multichunk: (a) => ({ type: "value", value: a.sourceString }),
 
