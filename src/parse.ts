@@ -23,17 +23,13 @@ const grammar = `Maraca {
     = text? "=" value
 
   func
-    = text "=>" text "=>" text "=>" value -- reduce_keys
-    | text "=>" text "=>>" value -- reduce
-    | text "=>" text "=>" value -- map_keys
-    | text "=>>" value -- map
-    | param? "=>" value -- func
+    = params ("=>>>" | "=>>" | "=>") value -- multi
+    | text? "=>" value -- single
+  
+  params
+    = "(" space* (param space*)* ")"
   
   param
-    = "(" space* (paramitem space*)* ")" -- block
-    | text -- text
-  
-  paramitem
     = text "=" value -- default
     | text -- text
 
@@ -121,39 +117,25 @@ s.addAttribute("ast", {
   attr: (a, _1, b) =>
     a.ast[0] ? { type: "attr", key: a.ast[0].value, value: b.ast } : [[b.ast]],
 
-  func_reduce_keys: (a, _1, b, _2, c, _3, d) => ({
+  func_multi: (a, b, c) => ({
     type: "func",
-    arg: { result: a.ast.value, value: b.ast.value, key: c.ast.value },
-    body: d.ast,
-  }),
-
-  func_reduce: (a, _1, b, _2, c) => ({
-    type: "func",
-    arg: { result: a.ast.value, value: b.ast.value },
+    mode: b.sourceString,
+    params: a.ast,
     body: c.ast,
   }),
 
-  func_map_keys: (a, _1, b, _2, c) => ({
+  func_single: (a, b, c) => ({
     type: "func",
-    arg: { value: a.ast.value, key: b.ast.value },
+    mode: b.sourceString,
+    params: a.ast[0]?.value,
     body: c.ast,
   }),
 
-  func_map: (a, _1, b) => ({
-    type: "func",
-    arg: { value: a.ast.value },
-    body: b.ast,
-  }),
+  params: (_1, _2, b, _3, _4) => b.ast,
 
-  func_func: (a, _1, b) => ({ type: "func", arg: a.ast[0], body: b.ast }),
+  param_default: (a, _1, b) => ({ key: a.ast.value, def: b.ast }),
 
-  param_block: (_1, _2, b, _3, _4) => b.ast,
-
-  param_text: (a) => a.ast.value,
-
-  paramitem_default: (a, _1, b) => ({ key: a.ast.value, def: b.ast }),
-
-  paramitem_text: (a) => ({ key: a.ast.value }),
+  param_text: (a) => ({ key: a.ast.value }),
 
   content: (a) => (Array.isArray(a.ast) ? a.ast : [a.ast]),
 

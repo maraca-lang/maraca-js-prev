@@ -42,27 +42,29 @@ const pushableDeep = (create, initial) => {
 
 const nilValue = { type: "value", value: "" };
 
-const buildFunc = ({ body, arg }, create, getVar) => {
-  if (!arg) return { type: "default", value: build(body, create, getVar) };
+const buildFunc = ({ mode, params, body }, create, getVar) => {
+  if (mode === "=>" && params.length === 0) {
+    return { type: "default", value: build(body, create, getVar) };
+  }
   const paramDefaults =
-    Array.isArray(arg) &&
-    arg.map((x) => (x.def ? build(x.def, create, getVar) : nilValue));
+    Array.isArray(params) &&
+    params.map((x) => (x.def ? build(x.def, create, getVar) : nilValue));
   return {
-    type: typeof arg === "string" ? "func" : arg.result ? "reduce" : "map",
-    body: body,
+    mode,
+    body,
     buildGetVar: (value, key, result) => (name) => {
-      if (typeof arg === "string") return name === arg ? value : getVar(name);
-      if (Array.isArray(arg)) {
-        if (value.type === "value") return nilValue;
-        const index = arg.findIndex((x) => x.key === name);
-        return index !== -1
-          ? value.content[index] || paramDefaults[index]
-          : getVar(name);
+      if (typeof params === "string") {
+        return name === params ? value : getVar(name);
       }
-      if (name === arg.value) return value;
-      if (name === arg.key) return { type: "value", value: key };
-      if (name === arg.result) return result;
-      return getVar(name);
+      const index = params.findIndex((x) => x.key === name);
+      if (index === -1) return getVar(name);
+      if (mode === "=>") {
+        if (value.type === "value") return nilValue;
+        return value.content[index] || paramDefaults[index];
+      }
+      return [result, value, key && { type: "value", value: key }].filter(
+        (x) => x
+      )[index];
     },
   };
 };
@@ -87,7 +89,7 @@ const build = (node, create, getVar) => {
         ? [build(c[0], create, newGetVar)]
         : build(c, create, newGetVar)
     );
-    const func = node.func && buildFunc(node.func, create, getVar);
+    const func = node.func && buildFunc(node.func, create, newGetVar);
     if (node.bracket === "<") {
       return { type: "block", values, content, func };
     }
@@ -173,14 +175,14 @@ const build = (node, create, getVar) => {
                 big.content[toIndex(small.value) - 1];
             }
             if (!next && big.func) {
-              if (big.func.type === "func") {
+              if (big.func.mode === "=>") {
                 next = build(
                   big.func.body,
                   create,
                   big.func.buildGetVar(small)
                 );
               } else if (small.type === "block") {
-                if (big.func.type === "map") {
+                if (big.func.mode === "=>>") {
                   next = {
                     type: "block",
                     values: mapObject(small.values, (v, k) =>

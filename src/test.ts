@@ -6,19 +6,40 @@ import render from "./render";
 // const script = `{x=1 <div <input value=@x> @x>}`;
 // const script = `<x=1 "test<blah>more" woop <x>>`;
 // const script = `(<a=10 x=>(@x + @a)>.@tick)`;
+// const script = `(@tick + 2)`;
 // const script = `(<1 @tick 3>.2)`;
 // const script = `(<(a b=20)=>(@a + @b)>.<10>)`;
-// const script = `(<v=>>(@v + 1)>.1)`;
-// const script = `(<res=>v=>>(@res + @v)>.<1 2 3>)`;
+const script = `(<(v)=>>(@v + 1)>.<1 2 3>)`;
+// const script = `(<(res v)=>>>(@res + @v)>.<1 2 3>)`;
 // const script = `<1 a=1 =<2 3 4 b=2>>`;
 
-const script = `
-<div
-  hover=""
-  style=<color=[@hover red =>green]>
-  "hello <span style=<"font-weight"=bold> 1> world!"
->
-`;
+// const script = `
+// {
+//   tasks=<>
+//   (@tick | <=@tasks @tick> -> @tasks)
+//   <div
+//     <h1 Todos>
+//     <input
+//       placeholder="Enter new task..."
+//       focus=""
+//       style=<padding=10px background=[@focus orange =>gold]>
+//     >
+//     =(@tasks.<task=>>{
+//       done=""
+//       <div
+//         hover=""
+//         (@hover | true -> @done)
+//         style=<
+//           cursor=pointer
+//           background=[@hover lightblue]
+//           "text-decoration"=[@done "line-through"]
+//         >
+//         @task
+//       >
+//     }>)
+//   >
+// }
+// `;
 
 const library = {
   tick: (set) => {
@@ -32,12 +53,13 @@ const library = {
   },
 };
 
-const root = document.createElement("div");
-document.body.appendChild(root);
-maraca(script, library, render(root));
+// const root = document.createElement("div");
+// document.body.appendChild(root);
+// maraca(script, library, render(root));
 
-// maraca(script, library, (data) => {
-//   console.log(JSON.stringify(data, null, 2));
-// });
+maraca(script, library, (data) => {
+  console.log(JSON.stringify(data, null, 2));
+});
 
 // operators
+// | operation for both | and =>
