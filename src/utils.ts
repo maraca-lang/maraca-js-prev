@@ -100,36 +100,6 @@ export const toJs = (data = { type: "value", value: "" } as any, config) => {
   return undefined;
 };
 
-const nilValue = { type: "value", value: "" };
-export const resolveType = (data, get) => {
-  const d = data || nilValue;
-  if (d.type === "stream") return resolveType(get(d.value), get);
-  if (d.type === "block") {
-    let values = {};
-    const content = d.content.reduce((res, x) => {
-      if (!Array.isArray(x)) return [...res, x];
-      const v = resolveType(x[0], get);
-      if (v.type !== "block") return res;
-      values = { ...values, ...v.values };
-      return [...res, ...v.content];
-    }, []);
-    return { ...d, values: { ...values, ...d.values }, content };
-  }
-  return d;
-};
-
-export const resolve = (data, get) => {
-  const d = resolveType(data, get);
-  if (d.type === "block") {
-    return {
-      ...d,
-      values: mapObject(d.values, (v) => resolve(v, get)),
-      content: d.content.map((c) => resolve(c, get)),
-    };
-  }
-  return d;
-};
-
 export const streamMap = (map) => (set, get) => () => set(map(get));
 
 export const sortMultiple = <T = any>(

@@ -23,8 +23,8 @@ const grammar = `Maraca {
     = text? "=" value
 
   func
-    = params ("=>>>" | "=>>" | "=>") value -- multi
-    | text? "=>" value -- single
+    = params space* ("=>>>" | "=>>" | "=>") space* value -- multi
+    | text? space* "=>" space* value -- single
   
   params
     = "(" space* (param space*)* ")"
@@ -45,14 +45,10 @@ const grammar = `Maraca {
     | escape
   
   expr
-    = "(" space* push space* ")"
+    = "(" space* pipe space* ")"
   
-  push
-    = emit space* "->" space* var -- push
-    | emit
-  
-  emit
-    = sum space* "|" space* sum -- emit
+  pipe
+    = sum space* "|" space* pipe -- pipe
     | sum
 
   sum
@@ -117,14 +113,14 @@ s.addAttribute("ast", {
   attr: (a, _1, b) =>
     a.ast[0] ? { type: "attr", key: a.ast[0].value, value: b.ast } : [[b.ast]],
 
-  func_multi: (a, b, c) => ({
+  func_multi: (a, _1, b, _2, c) => ({
     type: "func",
     mode: b.sourceString,
     params: a.ast,
     body: c.ast,
   }),
 
-  func_single: (a, b, c) => ({
+  func_single: (a, _1, b, _2, c) => ({
     type: "func",
     mode: b.sourceString,
     params: a.ast[0]?.value,
@@ -143,17 +139,11 @@ s.addAttribute("ast", {
 
   expr: (_1, _2, a, _3, _4) => a.ast,
 
-  push_push: (a, _1, _2, _3, b) => ({
-    type: "push",
+  pipe_pipe: (a, _1, _2, _3, b) => ({
+    type: "pipe",
     nodes: [a.ast, b.ast],
   }),
-  push: (a) => a.ast,
-
-  emit_emit: (a, _1, _2, _3, b) => ({
-    type: "emit",
-    nodes: [a.ast, b.ast],
-  }),
-  emit: (a) => a.ast,
+  pipe: (a) => a.ast,
 
   sum_sum: (a, _1, _2, _3, b) => ({
     type: "map",

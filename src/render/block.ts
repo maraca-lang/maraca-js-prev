@@ -22,19 +22,27 @@ export default class Block {
       if (type === "text") {
         this.node.update(data);
       } else {
-        const { value, hover, ...props } = toJs(data, {
-          value: () => "string",
-          hover: () => "boolean",
-          style: { "*": "string" },
-          "*": "string",
-        });
+        const { value, onmouseenter, onmouseleave, onfocus, onblur, ...props } =
+          toJs(data, {
+            value: () => "string",
+            onmouseenter: () => "boolean",
+            onmouseleave: () => "boolean",
+            onfocus: () => "boolean",
+            onblur: () => "boolean",
+            style: { "*": "string" },
+            "*": "string",
+          });
 
         this.node.updateProps({
           ...props,
           value: value.value || "",
           oninput: value.push && ((e) => value.push(fromJs(e.target.value))),
-          onmouseenter: hover.push && (() => hover.push(fromJs(true))),
-          onmouseleave: hover.push && (() => hover.push(fromJs(false))),
+          onmouseenter:
+            onmouseenter.push && (() => onmouseenter.push(fromJs(true))),
+          onmouseleave:
+            onmouseleave.push && (() => onmouseleave.push(fromJs(true))),
+          onfocus: onfocus.push && (() => onfocus.push(fromJs(true))),
+          onblur: onblur.push && (() => onblur.push(fromJs(true))),
         });
 
         const nodeChildren = this.children.update(data.content.slice(1));

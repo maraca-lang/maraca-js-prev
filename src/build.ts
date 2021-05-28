@@ -2,15 +2,13 @@ import {
   fromJs,
   isNil,
   mapObject,
-  resolve,
-  resolveType,
   streamMap,
   toIndex,
   toNumber,
 } from "./utils";
 
-const dataMap = (map) => (args, get) =>
-  fromJs(map(args.map((a) => resolveType(a, get))));
+const dataMap = (map) => (args, resolve) =>
+  fromJs(map(args.map((a) => resolve(a))));
 
 const numericMap = (map) =>
   dataMap((args) => {
@@ -23,28 +21,28 @@ const operators = {
   "+": numericMap(([a, b]) => a + b),
 };
 
-const pushable = (create, initial) =>
+const pushableValue = (create, initial) =>
   create((set) => {
     const push = (v) => set({ ...v, push });
     set({ ...initial, push });
   }, true);
-const pushableDeep = (create, initial) => {
+const pushable = (create, initial) => {
   const result =
     initial.type === "value"
       ? initial
       : {
           ...initial,
-          values: mapObject(initial.values, (v) => pushableDeep(create, v)),
-          content: initial.content.map((c) => pushableDeep(create, c)),
+          values: mapObject(initial.values, (v) => pushable(create, v)),
+          content: initial.content.map((c) => pushable(create, c)),
         };
-  return { type: "stream", value: pushable(create, result) };
+  return { type: "stream", value: pushableValue(create, result) };
 };
 
 const nilValue = { type: "value", value: "" };
 
 const buildFunc = ({ mode, params, body }, create, getVar) => {
-  if (mode === "=>" && params.length === 0) {
-    return { type: "default", value: build(body, create, getVar) };
+  if (mode === "=>" && !params) {
+    return { mode, value: build(body, create, getVar) };
   }
   const paramDefaults =
     Array.isArray(params) &&
@@ -69,7 +67,7 @@ const buildFunc = ({ mode, params, body }, create, getVar) => {
   };
 };
 
-const build = (node, create, getVar) => {
+const build = (node, create, getVar, canPush = false) => {
   if (typeof node === "function") {
     return { type: "stream", value: create(node) };
   }
@@ -78,7 +76,7 @@ const build = (node, create, getVar) => {
     const newGetVar = (name) => {
       if (values[name]) return values[name];
       if (node.values[name]) {
-        values[name] = build(node.values[name], create, newGetVar);
+        values[name] = build(node.values[name], create, newGetVar, true);
         return values[name];
       }
       return getVar(name);
@@ -99,14 +97,14 @@ const build = (node, create, getVar) => {
         let v = nilValue;
         const unpacked = content.reduce((res, x) => {
           if (!Array.isArray(x)) return [...res, x];
-          const v = resolveType(x[0], get);
+          const v = get(x[0]);
           return v.type === "block" ? [...res, ...v.content] : res;
         }, []);
         for (const c of unpacked) {
-          v = resolveType(c, get);
+          v = get(c);
           if (isNil(v) === (node.bracket === "[")) break;
         }
-        if (isNil(v) && func?.type === "default") v = func.value;
+        if (isNil(v) && func?.value) v = func.value;
         set(v);
       }),
     };
@@ -115,37 +113,34 @@ const build = (node, create, getVar) => {
     return getVar(node.name);
   }
   if (node.type === "value") {
-    return { type: "stream", value: pushable(create, node) };
+    if (canPush) return { type: "stream", value: pushableValue(create, node) };
+    return node;
   }
 
   const args = node.nodes.map((n) => build(n, create, getVar));
-  if (node.type === "push") {
-    return {
-      type: "stream",
-      value: create((_, get) => {
-        let source;
-        return () => {
-          const dest = resolveType(args[1], get);
-          const newSource = resolve(args[0], get);
-          if (source && dest.push && source !== newSource) {
-            dest.push(pushableDeep(create, newSource));
-          }
-          source = newSource;
-        };
-      }),
-    };
-  }
-  if (node.type === "emit") {
+  if (node.type === "pipe") {
     return {
       type: "stream",
       value: create((set, get) => {
-        let emit;
+        let input;
+        let output;
+        const push = (v) => {
+          if (input.push) input.push(pushable(create, get(v, true)));
+          else if (output.push) output.push(pushable(create, input));
+          else set({ ...output, push });
+        };
         return () => {
-          const newEmit = resolve(args[0], get);
-          if (emit !== newEmit && !isNil(newEmit)) {
-            set({ ...resolve(args[1], (x) => get(x, true)) });
+          const newInput = get(args[0], true);
+          const newOutput = get(args[1], true);
+          if (input !== newInput) {
+            if (newOutput.push) newOutput.push(pushable(create, newInput));
+            else set({ ...newOutput, push });
           }
-          emit = newEmit;
+          if (output !== newOutput) {
+            set({ ...newOutput, push });
+          }
+          input = newInput;
+          output = newOutput;
         };
       }),
     };
@@ -162,7 +157,7 @@ const build = (node, create, getVar) => {
       value: create((set, get, create) => {
         let prev;
         return () => {
-          const values = args.map((a) => resolveType(a, get));
+          const values = args.map((a) => get(a));
           const [big, small] =
             values[0].type === "block" && !values[1].func
               ? values
@@ -175,7 +170,9 @@ const build = (node, create, getVar) => {
                 big.content[toIndex(small.value) - 1];
             }
             if (!next && big.func) {
-              if (big.func.mode === "=>") {
+              if (big.func.value) {
+                next = big.func.value;
+              } else if (big.func.mode === "=>") {
                 next = build(
                   big.func.body,
                   create,
@@ -185,16 +182,22 @@ const build = (node, create, getVar) => {
                 if (big.func.mode === "=>>") {
                   next = {
                     type: "block",
-                    values: mapObject(small.values, (v, k) =>
-                      build(big.func.body, create, big.func.buildGetVar(v, k))
-                    ),
-                    content: small.content.map((v, i) =>
-                      build(
-                        big.func.body,
-                        create,
-                        big.func.buildGetVar(v, `${i + 1}`)
-                      )
-                    ),
+                    values: {
+                      ...big.values,
+                      ...mapObject(small.values, (v, k) =>
+                        build(big.func.body, create, big.func.buildGetVar(v, k))
+                      ),
+                    },
+                    content: [
+                      ...big.content,
+                      ...small.content.map((v, i) =>
+                        build(
+                          big.func.body,
+                          create,
+                          big.func.buildGetVar(v, `${i + 1}`)
+                        )
+                      ),
+                    ],
                   };
                 } else {
                   next = small.content.reduce((res, x, i) =>
