@@ -1,9 +1,9 @@
-import { mapObject, sortMultiple } from "./utils";
+import { sortMultiple } from "./utils";
 
 const obj = {};
 
 class Queue {
-  private queue: Set<any> | null = new Set();
+  private queue: Set<any> | null = null;
   add(streams: Set<any>) {
     const first = !this.queue;
     if (first) this.queue = new Set();
@@ -48,36 +48,8 @@ export class SourceStream {
   removeListener(x) {
     if (this.listeners.has(x)) this.listeners.delete(x);
   }
+  cancel() {}
 }
-
-const nilValue = { type: "value", value: "" };
-const resolveType = (data, getValue) => {
-  const d = data || nilValue;
-  if (d.type === "stream") return resolveType(getValue(d.value), getValue);
-  if (d.type === "block") {
-    let values = {};
-    const content = d.content.reduce((res, x) => {
-      if (!Array.isArray(x)) return [...res, x];
-      const v = resolveType(x[0], getValue);
-      if (v.type !== "block") return res;
-      values = { ...values, ...v.values };
-      return [...res, ...v.content];
-    }, []);
-    return { ...d, values: { ...values, ...d.values }, content };
-  }
-  return d;
-};
-const resolve = (data, getValue) => {
-  const d = resolveType(data, getValue);
-  if (d.type === "block") {
-    return {
-      ...d,
-      values: mapObject(d.values, (v) => resolve(v, getValue)),
-      content: d.content.map((c) => resolve(c, getValue)),
-    };
-  }
-  return d;
-};
 
 export class Stream {
   listeners = new Set<any>();
@@ -95,13 +67,6 @@ export class Stream {
       const creator = new Creator(queue, index);
       let firstUpdate = true;
       let isUpdating = true;
-      const getValue = (s) => {
-        if (isUpdating) {
-          active.add(s);
-          s.addListener(this);
-        }
-        return s.value;
-      };
       const update = run(
         (v) => {
           this.value = v;
@@ -110,7 +75,13 @@ export class Stream {
             queue.add(this.listeners);
           }
         },
-        (s, deep) => (deep ? resolve(s, getValue) : resolveType(s, getValue)),
+        (s) => {
+          if (isUpdating) {
+            active.add(s);
+            s.addListener(this);
+          }
+          return s.value;
+        },
         (...args) => (creator.create as any)(...args)
       );
       if (update) update();
@@ -205,13 +176,7 @@ export default (build, output?) => {
   const queue = new Queue();
   const creator = new Creator(queue, []) as any;
   const stream = build((...args) => creator.create(...args));
-  let hasOutput = false;
-  const outputWrap = (v) => {
-    hasOutput = true;
-    output(v);
-  };
-  stream.addListener(outputWrap);
-  queue.next();
-  if (!hasOutput) output(stream.value);
+  stream.addListener(output);
+  output(stream.value);
   return () => stream.removeListener();
 };

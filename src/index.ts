@@ -1,7 +1,7 @@
 import build from "./build";
 import parse from "./parse";
 import process from "./process";
-import { streamMap } from "./utils";
+import { resolve, streamMap } from "./utils";
 
 export default (source, library, onData) => {
   return process((create) => {
@@ -10,6 +10,6 @@ export default (source, library, onData) => {
       {}
     );
     const result = build(parse(source), create, (name) => builtLibrary[name]);
-    return create(streamMap((get) => get(result, true)));
+    return create(streamMap((get) => resolve(result, get)));
   }, onData);
 };

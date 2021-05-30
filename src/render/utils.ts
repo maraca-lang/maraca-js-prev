@@ -6,9 +6,6 @@ export const isObject = (x) =>
 export class Children {
   blocks = [] as any[];
   update(indices) {
-    for (let i = indices.length; i < this.blocks.length; i++) {
-      this.blocks[i].dispose();
-    }
     this.blocks.splice(indices.length);
     return indices
       .map((d, i) => {

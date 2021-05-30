@@ -15,7 +15,7 @@ import render from "./render";
 
 const script = `
 {
-  tasks=<A B C>
+  tasks=<<done="" text=world>>
   <div
     <h1 Todos>
     {
@@ -27,20 +27,25 @@ const script = `
         style=<padding=10px background=[@focus orange =>gold] outline=none>
       >
     }
+    <p
+      "Add task"
+      style=<background=lightgreen padding=10px>
+      onclick=(<=@tasks <done="" text=hi>> | @tasks)
+    >
     =(@tasks.<(task)=>>
       {
-        done=""
         hover=""
         <div
           onmouseenter=(true | @hover)
           onmouseleave=("" | @hover)
+          (@task.text)
+          onclick=(true | (@task.done))
           style=<
             padding=10px
             cursor=pointer
             background=[@hover lightblue]
-            "text-decoration"=[@done "line-through"]
+            "text-decoration"=[(@task.done) "line-through"]
           >
-          @task
         >
       }
     >)

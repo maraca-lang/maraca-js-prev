@@ -2,6 +2,9 @@ import {
   fromJs,
   isNil,
   mapObject,
+  resolve,
+  resolveData,
+  resolveType,
   streamMap,
   toIndex,
   toNumber,
@@ -21,11 +24,13 @@ const operators = {
   "+": numericMap(([a, b]) => a + b),
 };
 
-const pushableValue = (create, initial) =>
-  create((set) => {
+const pushableValue = (create, initial) => ({
+  type: "stream",
+  value: create((set) => {
     const push = (v) => set({ ...v, push });
     set({ ...initial, push });
-  }, true);
+  }, true),
+});
 const pushable = (create, initial) => {
   const result =
     initial.type === "value"
@@ -35,7 +40,7 @@ const pushable = (create, initial) => {
           values: mapObject(initial.values, (v) => pushable(create, v)),
           content: initial.content.map((c) => pushable(create, c)),
         };
-  return { type: "stream", value: pushableValue(create, result) };
+  return result.push ? pushableValue(create, result) : result;
 };
 
 const nilValue = { type: "value", value: "" };
@@ -67,7 +72,7 @@ const buildFunc = ({ mode, params, body }, create, getVar) => {
   };
 };
 
-const build = (node, create, getVar, canPush = false) => {
+const build = (node, create, getVar) => {
   if (typeof node === "function") {
     return { type: "stream", value: create(node) };
   }
@@ -76,7 +81,10 @@ const build = (node, create, getVar, canPush = false) => {
     const newGetVar = (name) => {
       if (values[name]) return values[name];
       if (node.values[name]) {
-        values[name] = build(node.values[name], create, newGetVar, true);
+        values[name] = pushableValue(
+          create,
+          build(node.values[name], create, newGetVar)
+        );
         return values[name];
       }
       return getVar(name);
@@ -97,11 +105,11 @@ const build = (node, create, getVar, canPush = false) => {
         let v = nilValue;
         const unpacked = content.reduce((res, x) => {
           if (!Array.isArray(x)) return [...res, x];
-          const v = get(x[0]);
+          const v = resolveData(x[0], get);
           return v.type === "block" ? [...res, ...v.content] : res;
         }, []);
         for (const c of unpacked) {
-          v = get(c);
+          v = resolveType(c, get);
           if (isNil(v) === (node.bracket === "[")) break;
         }
         if (isNil(v) && func?.value) v = func.value;
@@ -113,7 +121,6 @@ const build = (node, create, getVar, canPush = false) => {
     return getVar(node.name);
   }
   if (node.type === "value") {
-    if (canPush) return { type: "stream", value: pushableValue(create, node) };
     return node;
   }
 
@@ -121,21 +128,25 @@ const build = (node, create, getVar, canPush = false) => {
   if (node.type === "pipe") {
     return {
       type: "stream",
-      value: create((set, get) => {
+      value: create((set, get, create) => {
+        const wrapped = args.map((a) => ({
+          type: "stream",
+          value: create(streamMap((get) => resolve(a, get))),
+        }));
         let input;
         let output;
         const push = (v) => {
-          if (input.push) input.push(pushable(create, get(v, true)));
+          if (input.push) input.push(pushable(create, resolve(get, v)));
           else if (output.push) output.push(pushable(create, input));
           else set({ ...output, push });
         };
         return () => {
-          const newInput = get(args[0], true);
-          const newOutput = get(args[1], true);
-          if (input !== newInput) {
-            if (newOutput.push) newOutput.push(pushable(create, newInput));
-            else set({ ...newOutput, push });
-          }
+          const newInput = resolveType(wrapped[0], get);
+          const newOutput = resolveType(wrapped[1], get);
+          // if (input && input !== newInput) {
+          //   if (newOutput.push) newOutput.push(pushable(create, newInput));
+          //   else set({ ...newOutput, push });
+          // }
           if (output !== newOutput) {
             set({ ...newOutput, push });
           }
@@ -157,7 +168,7 @@ const build = (node, create, getVar, canPush = false) => {
       value: create((set, get, create) => {
         let prev;
         return () => {
-          const values = args.map((a) => get(a));
+          const values = args.map((a) => resolveData(a, get));
           const [big, small] =
             values[0].type === "block" && !values[1].func
               ? values

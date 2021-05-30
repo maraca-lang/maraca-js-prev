@@ -22,21 +22,30 @@ export default class Block {
       if (type === "text") {
         this.node.update(data);
       } else {
-        const { value, onmouseenter, onmouseleave, onfocus, onblur, ...props } =
-          toJs(data, {
-            value: () => "string",
-            onmouseenter: () => "boolean",
-            onmouseleave: () => "boolean",
-            onfocus: () => "boolean",
-            onblur: () => "boolean",
-            style: { "*": "string" },
-            "*": "string",
-          });
+        const {
+          value,
+          onclick,
+          onmouseenter,
+          onmouseleave,
+          onfocus,
+          onblur,
+          ...props
+        } = toJs(data, {
+          value: () => "string",
+          onclick: () => "boolean",
+          onmouseenter: () => "boolean",
+          onmouseleave: () => "boolean",
+          onfocus: () => "boolean",
+          onblur: () => "boolean",
+          style: { "*": "string" },
+          "*": "string",
+        });
 
         this.node.updateProps({
           ...props,
           value: value.value || "",
           oninput: value.push && ((e) => value.push(fromJs(e.target.value))),
+          onclick: onclick.push && (() => onclick.push(fromJs(true))),
           onmouseenter:
             onmouseenter.push && (() => onmouseenter.push(fromJs(true))),
           onmouseleave:
