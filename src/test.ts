@@ -15,45 +15,71 @@ import render from "./render";
 
 const script = `
 {
-  newtext=""
-  tasks=<<done="" text=world>>
-  <div
-    <h1 Todos>
-    {
-      focus=""
-      <input
-        value=@newtext
-        onfocus=(true | @focus)
-        onblur=("" | @focus)
-        placeholder="Enter new task..."
-        style=<padding=10px background=[@focus orange =>gold] outline=none>
-      >
-    }
-    <p
-      "Add task"
-      style=<background=lightgreen padding=10px>
-      onclick=(<=@tasks <done="" text=@newtext>> | @tasks)
+  map=<(inline pad color fill hover *other)=>
+    <
+      [@inline span =>div]
+      =(@other.<(x)=>>{(@map.@x) @x}>)
+      style=<padding=@pad color=@ background=@fill>
+      onmouseenter=(true | @hover)
+      onmouseleave=("" | @hover)
     >
-    =(@tasks.<(task)=>>
-      {
-        hover=""
-        <div
-          onmouseenter=(true | @hover)
-          onmouseleave=("" | @hover)
-          (@task.text)
-          onclick=((! @task.done) | (@task.done))
-          style=<
-            padding=10px
-            cursor=pointer
-            background=[@hover lightblue]
-            "text-decoration"=[(@task.done) "line-through"]
-          >
-        >
-      }
-    >)
   >
+  (@map.
+    <hello
+      color=white
+      fill=red
+      <
+        hover=""
+        inline=true
+        fill=[@hover lightgreen =>green]
+        world
+      >
+    >
+  )
 }
 `;
+
+// const script = `
+// {
+//   newtext=""
+//   tasks=<<done="" text=world>>
+//   <div
+//     <h1 Todos>
+//     {
+//       focus=""
+//       <input
+//         value=@newtext
+//         onfocus=(true | @focus)
+//         onblur=("" | @focus)
+//         placeholder="Enter new task..."
+//         style=<padding=10px background=[@focus orange =>gold] outline=none>
+//       >
+//     }
+//     <p
+//       "Add task"
+//       style=<background=lightgreen padding=10px>
+//       onclick=(<=@tasks <done="" text=@newtext>> | @tasks)
+//     >
+//     =(@tasks.<(task)=>>
+//       {
+//         hover=""
+//         <div
+//           onmouseenter=(true | @hover)
+//           onmouseleave=("" | @hover)
+//           (@task.text)
+//           onclick=((! @task.done) | (@task.done))
+//           style=<
+//             padding=10px
+//             cursor=pointer
+//             background=[@hover lightblue]
+//             "text-decoration"=[(@task.done) "line-through"]
+//           >
+//         >
+//       }
+//     >)
+//   >
+// }
+// `;
 
 const library = {
   tick: (set) => {

@@ -70,27 +70,80 @@ const buildFunc = ({ mode, params, body }, create, getVar) => {
   if (mode === "=>" && !params) {
     return { mode, value: build(body, create, getVar) };
   }
-  const paramDefaults =
+  const mappedParams =
     Array.isArray(params) &&
-    params.map((x) => (x.def ? build(x.def, create, getVar) : nilValue));
+    params
+      .filter((x) => !x.rest)
+      .map((x) => ({
+        ...x,
+        def: x.def ? build(x.def, create, getVar) : nilValue,
+      }));
+  const restParam = Array.isArray(params) && params.find((x) => x.rest);
   return {
-    mode,
+    mode: `${mode === "=>" && Array.isArray(params) ? "()" : ""}${mode}`,
     body,
     buildGetVar: (value, key, result) => (name) => {
       if (typeof params === "string") {
         return name === params ? value : getVar(name);
       }
-      const index = params.findIndex((x) => x.key === name);
-      if (index === -1) return getVar(name);
+      const argIndex = params.findIndex((x) => x.key === name);
+      if (argIndex === -1) return getVar(name);
       if (mode === "=>") {
         if (value.type === "value") return nilValue;
-        return value.content[index] || paramDefaults[index];
+        if (name === restParam?.key) {
+          const values = mapObject(value.values, (v, k) =>
+            mappedParams.find((x) => x.key === k) ? undefined : v
+          );
+          return { type: "block", values, content: value.content };
+        }
+        if (value.values[name]) return value.values[name];
+        if (restParam) return getVar(name);
+        const freeParams = mappedParams.filter((x) => !value.values[x.key]);
+        const freeIndex = freeParams.findIndex((x) => x.key === name);
+        if (freeIndex === -1) return getVar(name);
+        return value.content[freeIndex] || freeParams[freeIndex].def;
       }
       return [result, value, key && { type: "value", value: key }].filter(
         (x) => x
-      )[index];
+      )[argIndex];
     },
   };
+};
+
+const combineDot = (create, big, small) => {
+  if (big.type !== "block") return nilValue;
+  if (small.type === "value") {
+    return big.values[small.value] || big.content[toIndex(small.value) - 1];
+  }
+  if (!big.func) return nilValue;
+  if (big.func.value) return big.func.value;
+  if (big.func.mode === "=>") {
+    return build(big.func.body, create, big.func.buildGetVar(small));
+  }
+  if (small.type !== "block") return nilValue;
+  if (big.func.mode === "()=>") {
+    return build(big.func.body, create, big.func.buildGetVar(small));
+  }
+  if (big.func.mode === "=>>") {
+    return {
+      type: "block",
+      values: {
+        ...big.values,
+        ...mapObject(small.values, (v, k) =>
+          build(big.func.body, create, big.func.buildGetVar(v, k))
+        ),
+      },
+      content: [
+        ...big.content,
+        ...small.content.map((v, i) =>
+          build(big.func.body, create, big.func.buildGetVar(v, `${i + 1}`))
+        ),
+      ],
+    };
+  }
+  return small.content.reduce((res, x, i) =>
+    build(big.func.body, create, big.func.buildGetVar(x, `${i + 1}`, res))
+  );
 };
 
 const build = (node, create, getVar) => {
@@ -102,10 +155,13 @@ const build = (node, create, getVar) => {
     const newGetVar = (name) => {
       if (values[name]) return values[name];
       if (node.values[name]) {
-        values[name] = pushableValue(
-          create,
-          build(node.values[name], create, newGetVar)
-        );
+        values[name] =
+          node.values[name] === true
+            ? getVar(name)
+            : pushableValue(
+                create,
+                build(node.values[name], create, newGetVar)
+              );
         return values[name];
       }
       return getVar(name);
@@ -195,56 +251,7 @@ const build = (node, create, getVar) => {
             values[0].type === "block" && !values[1].func
               ? values
               : [values[1], values[0]];
-          let next;
-          if (big.type === "block") {
-            if (small.type === "value") {
-              next =
-                big.values[small.value] ||
-                big.content[toIndex(small.value) - 1];
-            }
-            if (!next && big.func) {
-              if (big.func.value) {
-                next = big.func.value;
-              } else if (big.func.mode === "=>") {
-                next = build(
-                  big.func.body,
-                  create,
-                  big.func.buildGetVar(small)
-                );
-              } else if (small.type === "block") {
-                if (big.func.mode === "=>>") {
-                  next = {
-                    type: "block",
-                    values: {
-                      ...big.values,
-                      ...mapObject(small.values, (v, k) =>
-                        build(big.func.body, create, big.func.buildGetVar(v, k))
-                      ),
-                    },
-                    content: [
-                      ...big.content,
-                      ...small.content.map((v, i) =>
-                        build(
-                          big.func.body,
-                          create,
-                          big.func.buildGetVar(v, `${i + 1}`)
-                        )
-                      ),
-                    ],
-                  };
-                } else {
-                  next = small.content.reduce((res, x, i) =>
-                    build(
-                      big.func.body,
-                      create,
-                      big.func.buildGetVar(x, `${i + 1}`, res)
-                    )
-                  );
-                }
-              }
-            }
-          }
-          if (!next) next = nilValue;
+          const next = combineDot(create, big, small);
           if (next !== prev) {
             if (prev && prev.type === "stream") prev.value.cancel();
             set(next);

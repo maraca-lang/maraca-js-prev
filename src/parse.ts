@@ -20,17 +20,19 @@ const grammar = `Maraca {
     | content
 
   attr
-    = text? "=" value
+    = text? "=" value -- attr
+    | text "=@" -- copy
 
   func
-    = params space* ("=>>>" | "=>>" | "=>") space* value -- multi
-    | text? space* "=>" space* value -- single
+    = params ("=>>>" | "=>>" | "=>") space* value -- multi
+    | text? "=>" space* value -- single
 
   params
     = "(" space* (param space*)* ")"
 
   param
     = text "=" value -- default
+    | "*" text -- rest
     | text -- text
 
   content
@@ -133,17 +135,18 @@ s.addAttribute("ast", {
 
   item: (a) => a.ast,
 
-  attr: (a, _1, b) =>
+  attr_attr: (a, _1, b) =>
     a.ast[0] ? { type: "attr", key: a.ast[0].value, value: b.ast } : [[b.ast]],
+  attr_copy: (a, _1) => ({ type: "attr", key: a.ast.value, value: true }),
 
-  func_multi: (a, _1, b, _2, c) => ({
+  func_multi: (a, b, _2, c) => ({
     type: "func",
     mode: b.sourceString,
     params: a.ast,
     body: c.ast,
   }),
 
-  func_single: (a, _1, b, _2, c) => ({
+  func_single: (a, b, _2, c) => ({
     type: "func",
     mode: b.sourceString,
     params: a.ast[0]?.value,
@@ -153,6 +156,8 @@ s.addAttribute("ast", {
   params: (_1, _2, b, _3, _4) => b.ast,
 
   param_default: (a, _1, b) => ({ key: a.ast.value, def: b.ast }),
+
+  param_rest: (_1, a) => ({ key: a.ast.value, rest: true }),
 
   param_text: (a) => ({ key: a.ast.value }),
 
