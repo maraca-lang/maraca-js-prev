@@ -2,6 +2,7 @@ import {
   fromJs,
   isNil,
   mapObject,
+  print,
   resolve,
   resolveData,
   resolveType,
@@ -10,18 +11,38 @@ import {
   toNumber,
 } from "./utils";
 
-const dataMap = (map) => (args, resolve) =>
-  fromJs(map(args.map((a) => resolve(a))));
+const dataMap = (map) => (args, get) =>
+  fromJs(map(...args.map((a) => resolve(a, get))));
 
 const numericMap = (map) =>
-  dataMap((args) => {
+  dataMap((...args) => {
     const values = args.map((a) => toNumber(a.value));
     if (values.some((v) => v === null)) return null;
-    return map(values);
+    return map(...values);
   });
 
+const unaryOperators = {
+  "!": dataMap((a) => isNil(a)),
+  "-": numericMap((a) => -a),
+};
 const operators = {
-  "+": numericMap(([a, b]) => a + b),
+  "<=": numericMap((a, b) => a <= b),
+  ">=": numericMap((a, b) => a >= b),
+  "<": numericMap((a, b) => a < b),
+  ">": numericMap((a, b) => a > b),
+  "!": numericMap((a, b) => a.type !== b.type || a.value !== b.value),
+  "=": ([s1, s2], get) => {
+    const [t1, t2] = [resolveType(s1, get), resolveType(s2, get)];
+    if (t1.type !== t2.type) return fromJs(false);
+    if (t1.type === "value") return fromJs(t1.value === t2.value);
+    return fromJs(print(resolve(t1, get)) === print(resolve(t2, get)));
+  },
+  "+": numericMap((a, b) => a + b),
+  "-": numericMap((a, b) => a - b),
+  "*": numericMap((a, b) => a * b),
+  "/": numericMap((a, b) => a / b),
+  "%": numericMap((a, b) => ((((a - 1) % b) + b) % b) + 1),
+  "^": numericMap((a, b) => a ** b),
 };
 
 const pushableValue = (create, initial) => ({
@@ -157,9 +178,10 @@ const build = (node, create, getVar) => {
     };
   }
   if (node.type === "map") {
+    const map = (args.length === 1 ? unaryOperators : operators)[node.func];
     return {
       type: "stream",
-      value: create(streamMap((get) => operators[node.func](args, get))),
+      value: create(streamMap((get) => map(args, get))),
     };
   }
   if (node.type === "dot") {

@@ -13,22 +13,22 @@ const grammar = `Maraca {
     = "<" space* (item space*)* ">"
     | "[" space* (item space*)* "]"
     | "{" space* (item space*)* "}"
-  
+
   item
     = attr
     | func
     | content
-  
+
   attr
     = text? "=" value
 
   func
     = params space* ("=>>>" | "=>>" | "=>") space* value -- multi
     | text? space* "=>" space* value -- single
-  
+
   params
     = "(" space* (param space*)* ")"
-  
+
   param
     = text "=" value -- default
     | text -- text
@@ -36,25 +36,42 @@ const grammar = `Maraca {
   content
     = valuebase
     | multi
-  
+
   valuebase
     = block
     | expr
     | var
     | name
     | escape
-  
+
   expr
     = "(" space* pipe space* ")"
-  
+
   pipe
-    = sum space* "|" space* pipe -- pipe
+    = not space* "|" space* pipe -- pipe
+    | not
+
+  not
+    = "!" space* comp -- not
+    | comp
+
+  comp
+    = comp space* ("<=" | ">=" | "<" | ">" | "!" | "=") space* sum -- comp
     | sum
 
   sum
-    = sum space* "+" space* dot -- sum
+    = sum space* ("+" | "-") space* prod -- sum
+    | "-" space* prod -- minus
+    | prod
+
+  prod
+    = prod space* ("*" | "/" | "%") space* pow -- prod
+    | pow
+
+  pow
+    = pow space* "^" space* dot -- pow
     | dot
-  
+
   dot
     = dot space* "." space* value -- dot
     | value
@@ -65,16 +82,16 @@ const grammar = `Maraca {
   text
     = string
     | name
-  
+
   string
     = "\\"" (stringchar | escape)* "\\""
 
   stringchar
     = ~("\\"" | "\\\\") any
-  
+
   multi
     = "\\"" (block | multichunk)* "\\""
-  
+
   multichunk
     = (multichar | escape)+
 
@@ -90,6 +107,12 @@ const grammar = `Maraca {
 
 const g = ohm.grammar(grammar);
 const s = g.createSemantics();
+
+const map = (a, _1, b, _3, c) => ({
+  type: "map",
+  func: b.sourceString,
+  nodes: [a.ast, c.ast],
+});
 
 s.addAttribute("ast", {
   start: (_1, a, _2) => a.ast,
@@ -145,12 +168,21 @@ s.addAttribute("ast", {
   }),
   pipe: (a) => a.ast,
 
-  sum_sum: (a, _1, _2, _3, b) => ({
-    type: "map",
-    func: "+",
-    nodes: [a.ast, b.ast],
-  }),
+  not_not: (_1, _2, a) => ({ type: "map", func: "!", nodes: [a.ast] }),
+  not: (a) => a.ast,
+
+  comp_comp: map,
+  comp: (a) => a.ast,
+
+  sum_sum: map,
+  sum_minus: (_1, _2, a) => ({ type: "map", func: "-", nodes: [a.ast] }),
   sum: (a) => a.ast,
+
+  prod_prod: map,
+  prod: (a) => a.ast,
+
+  pow_pow: map,
+  pow: (a) => a.ast,
 
   dot_dot: (a, _1, _2, _3, b) => ({
     type: "dot",

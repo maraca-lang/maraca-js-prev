@@ -15,12 +15,14 @@ import render from "./render";
 
 const script = `
 {
+  newtext=""
   tasks=<<done="" text=world>>
   <div
     <h1 Todos>
     {
       focus=""
       <input
+        value=@newtext
         onfocus=(true | @focus)
         onblur=("" | @focus)
         placeholder="Enter new task..."
@@ -30,7 +32,7 @@ const script = `
     <p
       "Add task"
       style=<background=lightgreen padding=10px>
-      onclick=(<=@tasks <done="" text=hi>> | @tasks)
+      onclick=(<=@tasks <done="" text=@newtext>> | @tasks)
     >
     =(@tasks.<(task)=>>
       {
@@ -39,7 +41,7 @@ const script = `
           onmouseenter=(true | @hover)
           onmouseleave=("" | @hover)
           (@task.text)
-          onclick=(true | (@task.done))
+          onclick=((! @task.done) | (@task.done))
           style=<
             padding=10px
             cursor=pointer
@@ -72,5 +74,3 @@ maraca(script, library, render(root));
 // maraca(script, library, (data) => {
 //   console.log(JSON.stringify(data, null, 2));
 // });
-
-// operators

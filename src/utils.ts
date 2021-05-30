@@ -151,3 +151,20 @@ export const sortMultiple = <T = any>(
     },
     0
   ) as -1 | 0 | 1;
+
+const printValue = (value) => {
+  if (!value) return "";
+  if (/^[a-zA-Z0-9]+$/.test(value)) return value;
+  return `"${value.replace(/(["\\])/g, (_, m) => `\\${m}`)}"`;
+};
+const printBlock = (values, content) => {
+  const printValues = Object.keys(values).map(
+    (k) => `${printValue(k)}=${print(values[k])}`
+  );
+  const printContent = content.map((c) => print(c));
+  return `<${[...printValues, ...printContent].join(" ")}>`;
+};
+export const print = (data) => {
+  if (data.type === "value") return printValue(data.value);
+  return printBlock(data.values, data.content);
+};
