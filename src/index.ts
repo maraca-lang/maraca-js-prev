@@ -3,6 +3,8 @@ import parse from "./parse";
 import process from "./process";
 import { resolve, streamMap } from "./utils";
 
+export { fromJs, isNil, toJs } from "./utils";
+
 export default (source, library, onData) => {
   return process((create) => {
     const builtLibrary = Object.keys(library).reduce(

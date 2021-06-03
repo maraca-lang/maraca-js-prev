@@ -43,6 +43,9 @@ const operators = {
   "/": numericMap((a, b) => a / b),
   "%": numericMap((a, b) => ((((a - 1) % b) + b) % b) + 1),
   "^": numericMap((a, b) => a ** b),
+  "&": dataMap((a, b) =>
+    a.type === "value" && b.type === "value" ? a.value + b.value : ""
+  ),
 };
 
 const pushableValue = (create, initial) => ({
@@ -113,9 +116,12 @@ const buildFunc = ({ mode, params, body }, create, getVar) => {
 const combineDot = (create, big, small) => {
   if (big.type !== "block") return nilValue;
   if (small.type === "value") {
-    return big.values[small.value] || big.content[toIndex(small.value) - 1];
+    const result =
+      big.values[small.value] || big.content[toIndex(small.value) - 1];
+    if (result) return result;
   }
   if (!big.func) return nilValue;
+  if (typeof big.func === "function") return big.func(small);
   if (big.func.value) return big.func.value;
   if (big.func.mode === "=>") {
     return build(big.func.body, create, big.func.buildGetVar(small));
@@ -149,6 +155,9 @@ const combineDot = (create, big, small) => {
 const build = (node, create, getVar) => {
   if (typeof node === "function") {
     return { type: "stream", value: create(node) };
+  }
+  if (node.type === "built") {
+    return node.value;
   }
   if (node.type === "block") {
     let values = {};
@@ -254,7 +263,7 @@ const build = (node, create, getVar) => {
       value: create((set, get, create) => {
         let prev;
         return () => {
-          const values = args.map((a) => resolveData(a, get));
+          const values = args.map((a) => resolve(a, get));
           const [big, small] =
             values[0].type === "block" && !values[1].func
               ? values

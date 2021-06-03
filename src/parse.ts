@@ -71,7 +71,11 @@ const grammar = `Maraca {
     | pow
 
   pow
-    = pow space* "^" space* dot -- pow
+    = pow space* "^" space* join -- pow
+    | join
+
+  join
+    = join space* "&" space* dot -- join
     | dot
 
   dot
@@ -188,6 +192,9 @@ s.addAttribute("ast", {
 
   pow_pow: map,
   pow: (a) => a.ast,
+
+  join_join: map,
+  join: (a) => a.ast,
 
   dot_dot: (a, _1, _2, _3, b) => ({
     type: "dot",

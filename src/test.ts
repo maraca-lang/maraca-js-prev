@@ -1,4 +1,4 @@
-import maraca from "./index";
+import maraca, { fromJs, isNil, toJs } from "./index";
 import render from "./render";
 
 // const script = `(@tick | 10)`;
@@ -15,21 +15,38 @@ import render from "./render";
 
 const script = `
 {
-  map=<(inline pad color fill hover *other)=>
-    <
-      [@inline span =>div]
-      =(@other.<(x)=>>{(@map.@x) @x}>)
-      style=<padding=@pad color=@ background=@fill>
-      onmouseenter=(true | @hover)
-      onmouseleave=("" | @hover)
-    >
+  map=<(inline size height font style pad color fill hover *other)=>
+    {
+      nextInline=(@hasValues.@other)
+      textStyle=@style
+      <
+        [@inline span =>div]
+        =(@other.<(x)=>>[(@isBlock.@x) (@map.<inline=@nextInline =@x>) =>@x]>)
+        style=<
+          fontSize=(@size & "px")
+          lineHeight=[@height (@height & [@size (@height > @size) "px"])]
+          fontFamily=@font
+          =(@fontStyles.@textStyle)
+          padding=@pad
+          color=@
+          background=@fill
+        >
+        onmouseenter=(true | @hover)
+        onmouseleave=("" | @hover)
+      >
+    }
   >
   (@map.
-    <hello
+    <
+      size=20
+      height="1.5"
+      font=Arial
+      style="bold italic"
       color=white
       fill=red
+      hello
       <
-        inline=true
+        style=" "
         fill=[@hover lightgreen =>green]
         world
       >
@@ -89,6 +106,31 @@ const library = {
       1000
     );
     return (dispose) => dispose && clearInterval(interval);
+  },
+  isBlock: {
+    type: "built",
+    value: fromJs((value) => fromJs(value.type === "block")),
+  },
+  hasValues: {
+    type: "built",
+    value: fromJs((value) =>
+      fromJs(value.content.some((x) => x.type === "value"))
+    ),
+  },
+  fontStyles: {
+    type: "built",
+    value: fromJs((value) => {
+      if (isNil(value)) return { type: "block", values: {}, content: [] };
+      const values = {
+        fontWeight: fromJs("normal"),
+        fontStyle: fromJs("normal"),
+      } as any;
+      for (const v of (toJs(value, "string") || "").split(" ")) {
+        if (v === "bold") values.fontWeight = fromJs("bold");
+        if (v === "italic") values.fontStyle = fromJs("italic");
+      }
+      return { type: "block", values, content: [] };
+    }),
   },
 };
 

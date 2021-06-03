@@ -63,6 +63,14 @@ export const fromJs = (value) => {
   if (value === true) return { type: "value", value: "true" };
   if (typeof value === "number") return { type: "value", value: `${value}` };
   if (typeof value === "string") return { type: "value", value };
+  if (typeof value === "function") {
+    return {
+      type: "block",
+      values: {},
+      content: [],
+      func: (arg) => value(arg),
+    };
+  }
   if (Object.prototype.toString.call(value) === "[object Object]") {
     return {
       type: "block",
