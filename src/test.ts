@@ -17,36 +17,53 @@ const script = `
 {
   map=<(inline size height font style pad color fill hover *other)=>
     {
-      nextInline=(@hasValues.@other)
+      nextInline={@inline (@hasValues.@other)}
       textStyle=@style
-      <
-        [@inline span =>div]
-        =(@other.<(x)=>>[(@isBlock.@x) (@map.<inline=@nextInline =@x>) =>@x]>)
+      base=<
+        onmouseenter=(true | @hover)
+        onmouseleave=("" | @hover)
         style=<
           fontSize=(@size & "px")
-          lineHeight=[@height (@height & [@size (@height > @size) "px"])]
+          lineHeight=[@height (@height & [(@height > 3) "px"])]
           fontFamily=@font
           =(@fontStyles.@textStyle)
           padding=@pad
           color=@
           background=@fill
         >
-        onmouseenter=(true | @hover)
-        onmouseleave=("" | @hover)
       >
+      content=(@other.<(x)=>>
+        [
+          (@isBlock.@x)
+          (@map.<inline=@nextInline size=@ height=@ =@x>)
+          =>@x
+        ]
+      >)
+      gap=(([(@height > 3) @height =>(@height * @size)] - @size) * "0.5" + 1)
+      [
+        @inline
+        <span =@content =@base>
+        =><div
+          =@base
+          <div
+            style=<padding="1px 0" minHeight=(@size & "px")>
+            <div
+              style=<marginTop=(-@gap & "px") marginBottom=(-@gap & "px")>
+              =@content
+            >
+          >
+        >
+      ]
     }
   >
   (@map.
     <
       size=20
       height="1.5"
-      font=Arial
-      style="bold italic"
       color=white
       fill=red
       hello
       <
-        style=" "
         fill=[@hover lightgreen =>green]
         world
       >
@@ -133,6 +150,15 @@ const library = {
     }),
   },
 };
+
+document.head.innerHTML += `<style>
+html {
+  box-sizing: border-box;
+}
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+</style>`;
 
 const root = document.createElement("div");
 document.body.appendChild(root);

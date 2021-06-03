@@ -50,7 +50,11 @@ const grammar = `Maraca {
     = "(" space* pipe space* ")"
 
   pipe
-    = not space* "|" space* pipe -- pipe
+    = join space* "|" space* pipe -- pipe
+    | join
+
+  join
+    = join space* "&" space* not -- join
     | not
 
   not
@@ -71,11 +75,7 @@ const grammar = `Maraca {
     | pow
 
   pow
-    = pow space* "^" space* join -- pow
-    | join
-
-  join
-    = join space* "&" space* dot -- join
+    = pow space* "^" space* dot -- pow
     | dot
 
   dot
@@ -177,6 +177,9 @@ s.addAttribute("ast", {
   }),
   pipe: (a) => a.ast,
 
+  join_join: map,
+  join: (a) => a.ast,
+
   not_not: (_1, _2, a) => ({ type: "map", func: "!", nodes: [a.ast] }),
   not: (a) => a.ast,
 
@@ -192,9 +195,6 @@ s.addAttribute("ast", {
 
   pow_pow: map,
   pow: (a) => a.ast,
-
-  join_join: map,
-  join: (a) => a.ast,
 
   dot_dot: (a, _1, _2, _3, b) => ({
     type: "dot",
