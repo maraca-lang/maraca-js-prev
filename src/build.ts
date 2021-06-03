@@ -152,19 +152,27 @@ const build = (node, create, getVar) => {
   }
   if (node.type === "block") {
     let values = {};
-    const newGetVar = (name) => {
+    const newGetVar = (
+      name,
+      captureUndef = node.bracket === "<" ? true : undefined
+    ) => {
       if (values[name]) return values[name];
       if (node.values[name]) {
         values[name] =
           node.values[name] === true
-            ? getVar(name)
+            ? getVar(name, captureUndef ? false : captureUndef)
             : pushableValue(
                 create,
                 build(node.values[name], create, newGetVar)
               );
         return values[name];
       }
-      return getVar(name);
+      const result = getVar(name, captureUndef ? false : captureUndef);
+      if (result || !captureUndef) return result;
+      return (values[name] = pushableValue(create, {
+        type: "value",
+        value: "",
+      }));
     };
     for (const name of Object.keys(node.values)) newGetVar(name);
     const content = node.content.map((c) =>

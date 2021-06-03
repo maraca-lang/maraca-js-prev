@@ -29,7 +29,6 @@ const script = `
       color=white
       fill=red
       <
-        hover=""
         inline=true
         fill=[@hover lightgreen =>green]
         world
