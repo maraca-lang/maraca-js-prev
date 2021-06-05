@@ -21,15 +21,14 @@ const grammar = `Maraca {
     | content
 
   attr
-    = text? "=" value -- attr
-    | text "=@" -- copy
+    = text? "=" value
 
   func
     = params ("=>>>" | "=>>" | "=>") space* value -- multi
     | text? "=>" space* value -- single
 
   merge
-    = text "+=" value
+    = text ("." text)* "+=" value
 
   params
     = "(" space* (param space*)* ")"
@@ -144,9 +143,8 @@ s.addAttribute("ast", {
 
   item: (a) => a.ast,
 
-  attr_attr: (a, _1, b) =>
+  attr: (a, _1, b) =>
     a.ast[0] ? { type: "attr", key: a.ast[0].value, value: b.ast } : [[b.ast]],
-  attr_copy: (a, _1) => ({ type: "attr", key: a.ast.value, value: true }),
 
   func_multi: (a, b, _2, c) => ({
     type: "func",
@@ -162,7 +160,11 @@ s.addAttribute("ast", {
     body: c.ast,
   }),
 
-  merge: (a, _1, b) => ({ type: "merge", key: a.ast.value, value: b.ast }),
+  merge: (a, _1, b, _2, c) => ({
+    type: "merge",
+    key: [a.ast, ...b.ast].map((x) => x.value),
+    value: c.ast,
+  }),
 
   params: (_1, _2, b, _3, _4) => b.ast,
 

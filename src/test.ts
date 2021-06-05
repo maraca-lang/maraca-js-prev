@@ -15,27 +15,43 @@ import render from "./render";
 
 const script = `
 {
-  map=<(inline size height font style pad color fill hover *other)=>
+  map=<(
+    inline
+    size=20 height="1.5" font=Arial style strike color
+    pad fill cursor
+    input placeholder
+    hover focus click
+    *other
+  )=>
     {
-      nextInline={@inline (@hasValues.@other)}
       textStyle=@style
       base=<
         hover+=(@onmouseenter | true)
         hover+=(@onmouseleave | "")
+        focus+=(@onfocus | true)
+        focus+=(@onblur | "")
+        click+=(@onclick | true)
         style=<
           fontSize=(@size & "px")
           lineHeight=[@height (@height & [(@height > 3) "px"])]
           fontFamily=@font
           =(@fontStyles.@textStyle)
           padding=@pad
-          color=@
+          color=@color
           background=@fill
+          cursor=@cursor
+          outline=none
+          "text-decoration"=[@strike "line-through"]
         >
       >
+      [
+        @input <input value=(@other.1) placeholder=@placeholder =@base>
+      ]
+      nextInline={@inline (@hasValues.@other)}
       content=(@other.<(x)=>>
         [
           (@isBlock.@x)
-          (@map.<inline=@nextInline size=@ height=@ =@x>)
+          (@map.<inline=@nextInline size={(@x.size) @size} height={(@x.height) @height} =@x>)
           =>@x
         ]
       >)
@@ -43,76 +59,59 @@ const script = `
       [
         @inline
         <span =@content =@base>
-        =><div
-          =@base
+        =>[
+          @nextInline
           <div
-            style=<padding="1px 0" minHeight=(@size & "px")>
+            =@base
             <div
-              style=<marginTop=(-@gap & "px") marginBottom=(-@gap & "px")>
-              =@content
+              style=<padding="1px 0" minHeight=(@size & "px")>
+              <div
+                style=<marginTop=(-@gap & "px") marginBottom=(-@gap & "px")>
+                =@content
+              >
             >
           >
-        >
+          =><div =@content =@base>
+        ]
       ]
     }
   >
   (@map.
-    <
-      size=20
-      height="1.5"
-      color=white
-      fill=red
-      hello
+    {
+      newText=""
+      tasks=<<text=X done="">>
       <
-        fill=[@hover lightgreen =>green]
-        world
+        <size=30 style=bold Todos>
+        <
+          input=true
+          placeholder="Enter new task..."
+          @newText
+          pad=10px
+          fill=[@focus orange =>gold]
+        >
+        <
+          fill=red
+          pad=10px
+          cursor=pointer
+          "Add task"
+          tasks+=(@click | <=@tasks <text={@newText "hi"} done="">>)
+          newText+=(@click | "")
+        >
+        (@tasks.<(task)=>>
+          <
+            pad=10px
+            cursor=pointer
+            fill=[@hover lightblue]
+            strike=(@task.done)
+            (@task.text)
+            task.done+=(@click | (!(@task.done)))
+          >
+        >)
       >
-    >
+    }
   )
 }
 `;
-
-// const script = `
-// {
-//   newtext=""
-//   tasks=<<done="" text=world>>
-//   <div
-//     <h1 Todos>
-//     {
-//       focus=""
-//       <input
-//         value=@newtext
-//         onfocus=(true | @focus)
-//         onblur=("" | @focus)
-//         placeholder="Enter new task..."
-//         style=<padding=10px background=[@focus orange =>gold] outline=none>
-//       >
-//     }
-//     <p
-//       "Add task"
-//       style=<background=lightgreen padding=10px>
-//       onclick=(<=@tasks <done="" text=@newtext>> | @tasks)
-//     >
-//     =(@tasks.<(task)=>>
-//       {
-//         hover=""
-//         <div
-//           onmouseenter=(true | @hover)
-//           onmouseleave=("" | @hover)
-//           (@task.text)
-//           onclick=((! @task.done) | (@task.done))
-//           style=<
-//             padding=10px
-//             cursor=pointer
-//             background=[@hover lightblue]
-//             "text-decoration"=[(@task.done) "line-through"]
-//           >
-//         >
-//       }
-//     >)
-//   >
-// }
-// `;
 
 const library = {
   tick: (set) => {
@@ -157,6 +156,69 @@ html {
 }
 *, *:before, *:after {
   box-sizing: inherit;
+}
+
+/* Displays for HTML 5 */
+article, aside, audio, command, datagrid, details, dialog, embed, 
+figcaption, figure, footer, header, hgroup, menu, nav, section, summary,
+video, wbr {
+	display: block;
+}
+
+bdi, figcaption, keygen, mark, meter, progress, rp, rt, ruby, time {
+	display: inline;
+}
+
+/* Deprecated tags */
+acronym, applet, big, center, dir, font, frame, frameset, noframes, s,
+strike, tt, u, xmp {
+	display: none;
+}
+
+/* Reset styles for all structural tags */
+a, abbr, area, article, aside, audio, b, bdo, blockquote, body, button, 
+canvas, caption, cite, code, col, colgroup, command, datalist, dd, del, 
+details, dialog, dfn, div, dl, dt, em, embed, fieldset, figure, form,
+h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, img, 
+input, ins, keygen, kbd, label, legend, li, map, mark, menu, meter, nav,
+noscript, object, ol, optgroup, option, output, p, param, pre, progress,
+q, rp, rt, ruby, samp, section, select, small, span, strong, sub, sup, 
+table, tbody, td, textarea, tfoot, th, thead, time, tr, ul, var, video {
+	background: transparent;
+	border: 0;
+	font-size: 100%;
+	font: inherit;
+	margin: 0;
+	outline: none;
+	padding: 0;
+	text-align: left;
+	text-decoration: none;
+	vertical-align: baseline;
+	z-index: 1;
+}
+
+/* Miscellaneous resets */
+body {
+	line-height: 1;
+}
+
+ol, ul {
+	list-style: none;
+}
+
+blockquote, q {
+	quotes: none;
+
+}
+
+blockquote:before, blockquote:after, q:before, q:after {
+	content: '';
+	content: none;
+}
+
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
 }
 </style>`;
 

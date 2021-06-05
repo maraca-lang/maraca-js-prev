@@ -110,7 +110,7 @@ const buildFunc = ({ mode, params, body }, create, getVar) => {
   };
 };
 
-const combineDot = (create, big, small) => {
+const combineDot = (get, create, big, small) => {
   if (big.type !== "block") return nilValue;
   if (small.type === "value") {
     const result =
@@ -118,7 +118,7 @@ const combineDot = (create, big, small) => {
     if (result) return result;
   }
   if (!big.func) return nilValue;
-  if (typeof big.func === "function") return big.func(small);
+  if (typeof big.func === "function") return big.func(resolve(small, get));
   if (big.func.value) return big.func.value;
   if (big.func.mode === "=>") {
     return build(big.func.body, create, big.func.buildGetVar(small));
@@ -154,8 +154,8 @@ const captureUndefined = (node, getVar) => {
     if (node.type === "var") {
       getVar(node.name);
     } else if (node.type === "merge") {
-      const dest = getVar(node.key);
-      if (dest !== nilValue) captureUndefined(node.value, getVar);
+      const dest = getVar(node.key[0]);
+      if (!(isNil(dest) && !dest.push)) captureUndefined(node.value, getVar);
     } else if (node.nodes) {
       node.nodes.map((n) => captureUndefined(n, getVar));
     }
@@ -177,14 +177,16 @@ const build = (node, create, getVar) => {
     ) => {
       if (values[name]) return values[name];
       if (node.values[name]) {
-        values[name] =
-          node.values[name] === true
-            ? getVar(name, captureUndef ? false : captureUndef)
-            : pushableValue(
-                create,
-                build(node.values[name], create, newGetVar)
-              );
-        return values[name];
+        return (values[name] = pushableValue(
+          create,
+          build(
+            node.values[name],
+            create,
+            node.values[name].type === "block" && node.values[name].func
+              ? newGetVar
+              : (n, c) => (n === name ? getVar(n, c) : newGetVar(n, c))
+          )
+        ));
       }
       const result = getVar(name, captureUndef ? false : captureUndef);
       if (result || !captureUndef) return result;
@@ -237,21 +239,30 @@ const build = (node, create, getVar) => {
   }
 
   if (node.type === "merge") {
-    const dest = getVar(node.key);
-    if (dest === nilValue) return nilValue;
+    const dest = getVar(node.key[0]);
+    if (isNil(dest) && !dest.push) return nilValue;
     const value = build(node.value, create, getVar);
     return {
       type: "stream",
       value: create((_, get) => {
-        let source;
-        return () => {
-          const destValue = resolveType(dest, get);
-          const newSource = resolve(value, get);
-          if (source && destValue.push && source !== newSource) {
-            destValue.push(pushable(create, newSource));
-          }
-          source = newSource;
-        };
+        const push = node.key.slice(1).reduce(
+          (res, k) => resolveData(res.values[k], (x) => get(x, true)),
+          resolveData(dest, (x) => get(x, true))
+        ).push;
+        if (push) {
+          const wrapped = {
+            type: "stream",
+            value: create(streamMap((get) => resolve(value, get))),
+          };
+          let source;
+          return () => {
+            const newSource = resolve(wrapped, get);
+            if (source && source !== newSource) {
+              push(pushable(create, newSource));
+            }
+            source = newSource;
+          };
+        }
       }),
     };
   }
@@ -289,12 +300,12 @@ const build = (node, create, getVar) => {
       value: create((set, get, create) => {
         let prev;
         return () => {
-          const values = args.map((a) => resolve(a, get));
+          const values = args.map((a) => resolveData(a, get));
           const [big, small] =
             values[0].type === "block" && !values[1].func
               ? values
               : [values[1], values[0]];
-          const next = combineDot(create, big, small);
+          const next = combineDot(get, create, big, small);
           if (next !== prev) {
             if (prev && prev.type === "stream") prev.value.cancel();
             set(next);

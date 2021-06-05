@@ -47,6 +47,7 @@ export const resolveData = (data, get) => {
       values: { ...values, ...d.values },
       content,
       func: d.func,
+      push: d.push,
     };
   }
   return d;
