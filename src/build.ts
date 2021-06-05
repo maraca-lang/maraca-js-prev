@@ -75,13 +75,11 @@ const buildFunc = ({ mode, params, body }, create, getVar) => {
   }
   const mappedParams =
     Array.isArray(params) &&
-    params
-      .filter((x) => !x.rest)
-      .map((x) => ({
-        ...x,
-        def: x.def ? build(x.def, create, getVar) : nilValue,
-      }));
-  const restParam = Array.isArray(params) && params.find((x) => x.rest);
+    params.map((x) => ({
+      ...x,
+      def: x.def ? build(x.def, create, getVar) : nilValue,
+    }));
+  const hasRest = Array.isArray(params) && params.some((x) => x.rest);
   return {
     mode: `${mode === "=>" && Array.isArray(params) ? "()" : ""}${mode}`,
     body,
@@ -89,26 +87,25 @@ const buildFunc = ({ mode, params, body }, create, getVar) => {
       if (typeof params === "string") {
         return name === params ? value : getVar(name);
       }
-      const argIndex = params.findIndex((x) => x.key === name);
-      if (argIndex === -1) return getVar(name);
+      const index = mappedParams.findIndex((x) => x.key === name);
+      if (index === -1) return getVar(name);
       if (mode === "=>") {
         if (value.type === "value") return nilValue;
-        if (name === restParam?.key) {
+        if (mappedParams[index].rest) {
           const values = mapObject(value.values, (v, k) =>
-            mappedParams.find((x) => x.key === k) ? undefined : v
+            mappedParams.find((x) => !x.rest && x.key === k) ? undefined : v
           );
           return { type: "block", values, content: value.content };
         }
         if (value.values[name]) return value.values[name];
-        if (restParam) return getVar(name);
+        if (hasRest) return mappedParams[index].def;
         const freeParams = mappedParams.filter((x) => !value.values[x.key]);
         const freeIndex = freeParams.findIndex((x) => x.key === name);
-        if (freeIndex === -1) return getVar(name);
         return value.content[freeIndex] || freeParams[freeIndex].def;
       }
       return [result, value, key && { type: "value", value: key }].filter(
         (x) => x
-      )[argIndex];
+      )[index];
     },
   };
 };
@@ -154,8 +151,14 @@ const combineDot = (create, big, small) => {
 
 const captureUndefined = (node, getVar) => {
   if (typeof node !== "function") {
-    if (node.type === "var") getVar(node.name);
-    else if (node.nodes) node.nodes.map((n) => captureUndefined(n, getVar));
+    if (node.type === "var") {
+      getVar(node.name);
+    } else if (node.type === "merge") {
+      const dest = getVar(node.key);
+      if (dest !== nilValue) captureUndefined(node.value, getVar);
+    } else if (node.nodes) {
+      node.nodes.map((n) => captureUndefined(n, getVar));
+    }
   }
 };
 
@@ -185,10 +188,7 @@ const build = (node, create, getVar) => {
       }
       const result = getVar(name, captureUndef ? false : captureUndef);
       if (result || !captureUndef) return result;
-      return (values[name] = pushableValue(create, {
-        type: "value",
-        value: "",
-      }));
+      return (values[name] = pushableValue(create, nilValue));
     };
 
     node.content.forEach((c) =>
@@ -236,23 +236,27 @@ const build = (node, create, getVar) => {
     return node;
   }
 
-  const args = node.nodes.map((n) => build(n, create, getVar));
   if (node.type === "merge") {
+    const dest = getVar(node.key);
+    if (dest === nilValue) return nilValue;
+    const value = build(node.value, create, getVar);
     return {
       type: "stream",
       value: create((_, get) => {
         let source;
         return () => {
-          const dest = resolveType(args[0], get);
-          const newSource = resolve(args[1], get);
-          if (source && dest.push && source !== newSource) {
-            dest.push(pushable(create, newSource));
+          const destValue = resolveType(dest, get);
+          const newSource = resolve(value, get);
+          if (source && destValue.push && source !== newSource) {
+            destValue.push(pushable(create, newSource));
           }
           source = newSource;
         };
       }),
     };
   }
+
+  const args = node.nodes.map((n) => build(n, create, getVar));
   if (node.type === "pipe") {
     return {
       type: "stream",

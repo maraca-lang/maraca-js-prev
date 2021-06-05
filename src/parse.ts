@@ -162,10 +162,7 @@ s.addAttribute("ast", {
     body: c.ast,
   }),
 
-  merge: (a, _1, b) => ({
-    type: "merge",
-    nodes: [{ type: "var", name: a.ast.value }, b.ast],
-  }),
+  merge: (a, _1, b) => ({ type: "merge", key: a.ast.value, value: b.ast }),
 
   params: (_1, _2, b, _3, _4) => b.ast,
 
