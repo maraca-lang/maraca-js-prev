@@ -47,16 +47,16 @@ const script = `
         >
       >
       [
-        @input <input value=(@other.1) placeholder=@placeholder =@base>
+        @input <input value=@other.1 placeholder=@placeholder =@base>
       ]
-      nextInline={@inline (@hasValues.@other)}
-      content=(@other.<(x)=>>
+      nextInline={@inline @hasValues.@other}
+      content=@other.<(x)=>>
         [
-          (@isBlock.@x)
-          (@map.<inline=@nextInline size={(@x.size) @size} height={(@x.height) @height} =@x>)
+          @isBlock.@x
+          @map.<inline=@nextInline size={@x.size @size} height={@x.height @height} =@x>
           =>@x
         ]
-      >)
+      >
       gap=(([(@height > 3) @height =>(@height * @size)] - @size) * "0.5" + 1)
       [
         @inline
@@ -68,7 +68,7 @@ const script = `
             <div
               style=<padding="1px 0" "min-height"="{@size}px">
               <div
-                style=<"margin-top"="{(-@gap)}px" "margin-bottom"="{(-@gap)}px">
+                style=<"margin-top"="{-@gap}px" "margin-bottom"="{-@gap}px">
                 =@content
               >
             >
@@ -78,40 +78,38 @@ const script = `
       ]
     }
   >
-  (@map.
-    {
-      newText=""
-      tasks=<<text=X done="">>
+  @map.{
+    newText=""
+    tasks=<<text=X done="">>
+    <
+      <size=30 bold=true Todos>
       <
-        <size=30 bold=true Todos>
+        input=true
+        placeholder="Enter new task..."
+        @newText
+        pad=10px
+        fill=[@focus orange =>gold]
+      >
+      <
+        fill=red
+        pad=10px
+        cursor=pointer
+        "Add task"
+        tasks+=(@click | <=@tasks <text={@newText "hi"} done="">>)
+        newText+=(@click | "")
+      >
+      @tasks.<(task)=>>
         <
-          input=true
-          placeholder="Enter new task..."
-          @newText
-          pad=10px
-          fill=[@focus orange =>gold]
-        >
-        <
-          fill=red
           pad=10px
           cursor=pointer
-          "Add task"
-          tasks+=(@click | <=@tasks <text={@newText "hi"} done="">>)
-          newText+=(@click | "")
+          fill=[@hover lightblue]
+          strike=@task.done
+          @task.text
+          task.done+=(@click | !@task.done)
         >
-        (@tasks.<(task)=>>
-          <
-            pad=10px
-            cursor=pointer
-            fill=[@hover lightblue]
-            strike=(@task.done)
-            (@task.text)
-            task.done+=(@click | (!(@task.done)))
-          >
-        >)
       >
-    }
-  )
+    >
+  }
 }
 `;
 

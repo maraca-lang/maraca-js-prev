@@ -6,6 +6,10 @@ const grammar = `Maraca {
     = space* value space*
 
   value
+    = value "." valueinner -- dot
+    | valueinner
+  
+  valueinner
     = valuebase
     | template
 
@@ -41,13 +45,15 @@ const grammar = `Maraca {
     = text ("." text)* "+=" value
 
   content
-    = valuebase
-    | multi
+    = multi
+    | value
 
   valuebase
     = block
     | valueblock
     | expr
+    | not
+    | minus
     | var
     | name
     | escape
@@ -56,11 +62,7 @@ const grammar = `Maraca {
     = "(" space* pipe space* ")"
 
   pipe
-    = pipe space* "|" space* not -- pipe
-    | not
-
-  not
-    = "!" space* comp -- not
+    = pipe space* "|" space* comp -- pipe
     | comp
 
   comp
@@ -69,7 +71,6 @@ const grammar = `Maraca {
 
   sum
     = sum space* ("+" | "-") space* prod -- sum
-    | "-" space* prod -- minus
     | prod
 
   prod
@@ -77,12 +78,14 @@ const grammar = `Maraca {
     | pow
 
   pow
-    = pow space* "^" space* dot -- pow
-    | dot
-
-  dot
-    = dot space* "." space* value -- dot
+    = pow space* "^" space* value -- pow
     | value
+
+  not
+    = "!" value
+
+  minus
+    = "-" value
 
   var
     = "@" text
@@ -150,7 +153,13 @@ const map = (a, _1, b, _3, c) => ({
 s.addAttribute("ast", {
   start: (_1, a, _2) => a.ast,
 
+  value_dot: (a, _1, b) => ({
+    type: "dot",
+    nodes: [a.ast, b.ast],
+  }),
   value: (a) => a.ast,
+
+  valueinner: (a) => a.ast,
 
   block,
 
@@ -201,14 +210,10 @@ s.addAttribute("ast", {
   }),
   pipe: (a) => a.ast,
 
-  not_not: (_1, _2, a) => ({ type: "map", func: "!", nodes: [a.ast] }),
-  not: (a) => a.ast,
-
   comp_comp: map,
   comp: (a) => a.ast,
 
   sum_sum: map,
-  sum_minus: (_1, _2, a) => ({ type: "map", func: "-", nodes: [a.ast] }),
   sum: (a) => a.ast,
 
   prod_prod: map,
@@ -217,11 +222,9 @@ s.addAttribute("ast", {
   pow_pow: map,
   pow: (a) => a.ast,
 
-  dot_dot: (a, _1, _2, _3, b) => ({
-    type: "dot",
-    nodes: [a.ast, b.ast],
-  }),
-  dot: (a) => a.ast,
+  not: (_1, a) => ({ type: "map", func: "!", nodes: [a.ast] }),
+
+  minus: (_1, a) => ({ type: "map", func: "-", nodes: [a.ast] }),
 
   var: (_1, a) => ({ type: "var", name: a.ast.value }),
 

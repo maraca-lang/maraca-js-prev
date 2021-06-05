@@ -5,7 +5,6 @@ import {
   print,
   resolve,
   resolveData,
-  resolvePush,
   resolveType,
   streamMap,
   toIndex,
@@ -249,7 +248,7 @@ const build = (node, create, getVar) => {
             (res, k) => resolveData(res, (x) => get(x, true))?.values?.[k],
             dest
           );
-        const push = resolvePush(destStream, get).push;
+        const push = resolveType(destStream, get).push;
         if (push) {
           const wrapped = {
             type: "stream",
