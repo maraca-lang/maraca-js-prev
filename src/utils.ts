@@ -33,6 +33,7 @@ export const resolveData = (data, get) => {
   const d = data || nilValue;
   if (d.type === "stream") return resolveData(get(d.value), get);
   if (d.type === "block") {
+    if (d.merge) d.merge.map((s) => resolveType(s, get));
     let values = {};
     const content = d.content.reduce((res, x) => {
       if (!Array.isArray(x)) return [...res, x];
@@ -41,7 +42,12 @@ export const resolveData = (data, get) => {
       values = { ...values, ...v.values };
       return [...res, ...v.content];
     }, []);
-    return { ...d, values: { ...values, ...d.values }, content };
+    return {
+      type: d.type,
+      values: { ...values, ...d.values },
+      content,
+      func: d.func,
+    };
   }
   return d;
 };

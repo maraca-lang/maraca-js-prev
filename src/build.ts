@@ -152,6 +152,13 @@ const combineDot = (create, big, small) => {
   );
 };
 
+const captureUndefined = (node, getVar) => {
+  if (typeof node !== "function") {
+    if (node.type === "var") getVar(node.name);
+    else if (node.nodes) node.nodes.map((n) => captureUndefined(n, getVar));
+  }
+};
+
 const build = (node, create, getVar) => {
   if (typeof node === "function") {
     return { type: "stream", value: create(node) };
@@ -183,20 +190,31 @@ const build = (node, create, getVar) => {
         value: "",
       }));
     };
+
+    node.content.forEach((c) =>
+      captureUndefined(Array.isArray(c) ? c[0] : c, newGetVar)
+    );
+    node.merge.forEach((x) => captureUndefined(x, newGetVar));
+
     for (const name of Object.keys(node.values)) newGetVar(name);
     const content = node.content.map((c) =>
       Array.isArray(c)
         ? [build(c[0], create, newGetVar)]
         : build(c, create, newGetVar)
     );
-    const func = node.func && buildFunc(node.func, create, newGetVar);
+    const merge = node.merge.map((x) => build(x, create, newGetVar));
+    const func =
+      node.func &&
+      buildFunc(node.func, create, (name) => newGetVar(name, false));
+
     if (node.bracket === "<") {
-      return { type: "block", values, content, func };
+      return { type: "block", values, content, func, merge };
     }
     return {
       type: "stream",
       value: create((set, get) => () => {
         let v = nilValue;
+        merge.map((s) => resolveType(s, get));
         const unpacked = content.reduce((res, x) => {
           if (!Array.isArray(x)) return [...res, x];
           const v = resolveData(x[0], get);
@@ -219,33 +237,37 @@ const build = (node, create, getVar) => {
   }
 
   const args = node.nodes.map((n) => build(n, create, getVar));
+  if (node.type === "merge") {
+    return {
+      type: "stream",
+      value: create((_, get) => {
+        let source;
+        return () => {
+          const dest = resolveType(args[0], get);
+          const newSource = resolve(args[1], get);
+          if (source && dest.push && source !== newSource) {
+            dest.push(pushable(create, newSource));
+          }
+          source = newSource;
+        };
+      }),
+    };
+  }
   if (node.type === "pipe") {
     return {
       type: "stream",
       value: create((set, get, create) => {
-        const wrapped = args.map((a) => ({
+        const wrapped = {
           type: "stream",
-          value: create(streamMap((get) => resolve(a, get))),
-        }));
-        let input;
-        let output;
-        const push = (v) => {
-          if (input.push) input.push(pushable(create, resolve(get, v)));
-          else if (output.push) output.push(pushable(create, input));
-          else set({ ...output, push });
+          value: create(streamMap((get) => resolve(args[0], get))),
         };
+        let input;
         return () => {
-          const newInput = resolveType(wrapped[0], get);
-          const newOutput = resolveType(wrapped[1], get);
-          // if (input && input !== newInput) {
-          //   if (newOutput.push) newOutput.push(pushable(create, newInput));
-          //   else set({ ...newOutput, push });
-          // }
-          if (output !== newOutput) {
-            set({ ...newOutput, push });
+          const newInput = resolveType(wrapped, get);
+          if (!input || (input !== newInput && !isNil(newInput))) {
+            set({ ...resolve(args[1], (x) => get(x, true)) });
           }
           input = newInput;
-          output = newOutput;
         };
       }),
     };

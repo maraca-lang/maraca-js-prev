@@ -66,7 +66,6 @@ export class Stream {
       let active = new Set<any>();
       const creator = new Creator(queue, index);
       let firstUpdate = true;
-      let isUpdating = true;
       const update = run(
         (v) => {
           this.value = v;
@@ -75,20 +74,17 @@ export class Stream {
             queue.add(this.listeners);
           }
         },
-        (s) => {
-          if (isUpdating) {
-            active.add(s);
-            s.addListener(this);
-          }
+        (s, snapshot) => {
+          s.addListener(this);
+          if (snapshot) s.removeListener(this);
+          else active.add(s);
           return s.value;
         },
         (...args) => (creator.create as any)(...args)
       );
       if (update) update();
-      isUpdating = false;
       firstUpdate = false;
       this.update = () => {
-        isUpdating = true;
         const prevActive = active;
         active = new Set();
         creator.reset();
@@ -96,7 +92,6 @@ export class Stream {
         for (const s of prevActive) {
           if (!active.has(s)) s.removeListener(this);
         }
-        isUpdating = false;
       };
       this.stop = () => {
         queue.remove(this);

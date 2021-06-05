@@ -17,6 +17,7 @@ const grammar = `Maraca {
   item
     = attr
     | func
+    | merge
     | content
 
   attr
@@ -26,6 +27,9 @@ const grammar = `Maraca {
   func
     = params ("=>>>" | "=>>" | "=>") space* value -- multi
     | text? "=>" space* value -- single
+
+  merge
+    = text "+=" value
 
   params
     = "(" space* (param space*)* ")"
@@ -135,6 +139,7 @@ s.addAttribute("ast", {
       .filter((x) => Array.isArray(x))
       .reduce((res, x) => [...res, ...x], []),
     func: b.ast.find((x) => !Array.isArray(x) && x.type === "func"),
+    merge: b.ast.filter((x) => !Array.isArray(x) && x.type === "merge"),
   }),
 
   item: (a) => a.ast,
@@ -155,6 +160,11 @@ s.addAttribute("ast", {
     mode: b.sourceString,
     params: a.ast[0]?.value,
     body: c.ast,
+  }),
+
+  merge: (a, _1, b) => ({
+    type: "merge",
+    nodes: [{ type: "var", name: a.ast.value }, b.ast],
   }),
 
   params: (_1, _2, b, _3, _4) => b.ast,
