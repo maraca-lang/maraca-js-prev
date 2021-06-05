@@ -14,27 +14,24 @@ const grammar = `Maraca {
     | template
 
   block
-    = "<" space* (item space*)* ">"
+    = "<" space* listOf<item, space+> space* ">"
 
   valueblock
-    = "[" space* (item space*)* "]"
-    | "{" space* (item space*)* "}"
+    = "[" space* listOf<item, space+> space* "]"
+    | "{" space* listOf<item, space+> space* "}"
 
   item
-    = attr
-    | func
+    = func
     | merge
+    | attr
     | content
-
-  attr
-    = text? "=" value
 
   func
     = params ("=>>>" | "=>>" | "=>") space* value -- multi
     | text? "=>" space* value -- single
 
   params
-    = "(" space* (param space*)* ")"
+    = "(" space* listOf<param, space+> space* ")"
 
   param
     = text "=" value -- default
@@ -42,7 +39,10 @@ const grammar = `Maraca {
     | text -- text
 
   merge
-    = text ("." text)* "+=" value
+    = listOf<text, "."> "+=" space* value
+
+  attr
+    = text? "=" space* value
 
   content
     = multi
@@ -167,9 +167,6 @@ s.addAttribute("ast", {
 
   item: (a) => a.ast,
 
-  attr: (a, _1, b) =>
-    a.ast[0] ? { type: "attr", key: a.ast[0].value, value: b.ast } : [[b.ast]],
-
   func_multi: (a, b, _2, c) => ({
     type: "func",
     mode: b.sourceString,
@@ -192,11 +189,14 @@ s.addAttribute("ast", {
 
   param_text: (a) => ({ key: a.ast.value }),
 
-  merge: (a, _1, b, _2, c) => ({
+  merge: (a, _1, _2, b) => ({
     type: "merge",
-    key: [a.ast, ...b.ast].map((x) => x.value),
-    value: c.ast,
+    key: a.ast.map((x) => x.value),
+    value: b.ast,
   }),
+
+  attr: (a, _1, _2, b) =>
+    a.ast[0] ? { type: "attr", key: a.ast[0].value, value: b.ast } : [[b.ast]],
 
   content: (a) => (Array.isArray(a.ast) ? a.ast : [a.ast]),
 
@@ -255,10 +255,16 @@ s.addAttribute("ast", {
   name: (a) => ({ type: "value", value: a.sourceString }),
 
   escape: (_1, a) => ({ type: "value", value: a.sourceString }),
+
+  listOf: (a) => a.ast,
+  nonemptyListOf: (a, _1, b) => [a.ast, ...b.ast],
 });
 
 export default (script) => {
   const m = g.match(script);
-  if (m.failed()) throw new Error("Parser error");
+  if (m.failed()) {
+    console.error(m.message);
+    throw new Error("Parser error");
+  }
   return s(m).ast;
 };
