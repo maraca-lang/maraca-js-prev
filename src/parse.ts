@@ -7,11 +7,13 @@ const grammar = `Maraca {
 
   value
     = valuebase
-    | string
+    | template
 
   block
     = "<" space* (item space*)* ">"
-    | "[" space* (item space*)* "]"
+
+  valueblock
+    = "[" space* (item space*)* "]"
     | "{" space* (item space*)* "}"
 
   item
@@ -27,9 +29,6 @@ const grammar = `Maraca {
     = params ("=>>>" | "=>>" | "=>") space* value -- multi
     | text? "=>" space* value -- single
 
-  merge
-    = text ("." text)* "+=" value
-
   params
     = "(" space* (param space*)* ")"
 
@@ -38,12 +37,16 @@ const grammar = `Maraca {
     | "*" text -- rest
     | text -- text
 
+  merge
+    = text ("." text)* "+=" value
+
   content
     = valuebase
     | multi
 
   valuebase
     = block
+    | valueblock
     | expr
     | var
     | name
@@ -53,11 +56,7 @@ const grammar = `Maraca {
     = "(" space* pipe space* ")"
 
   pipe
-    = join space* "|" space* pipe -- pipe
-    | join
-
-  join
-    = join space* "&" space* not -- join
+    = pipe space* "|" space* not -- pipe
     | not
 
   not
@@ -99,13 +98,25 @@ const grammar = `Maraca {
     = ~("\\"" | "\\\\") any
 
   multi
-    = "\\"" (block | multichunk)* "\\""
+    = "\\"" (block | multitemplate)* "\\""
+  
+  multitemplate
+    = (valueblock | multichunk)+
 
   multichunk
     = (multichar | escape)+
 
   multichar
     = ~("\\"" | "<" | "[" | "{" | "\\\\") any
+
+  template
+    = "\\"" (valueblock | templatechunk)* "\\""
+
+  templatechunk
+    = (templatechar | escape)+
+
+  templatechar
+    = ~("\\"" | "[" | "{" | "\\\\") any
 
   name
     = alnum+
@@ -116,6 +127,19 @@ const grammar = `Maraca {
 
 const g = ohm.grammar(grammar);
 const s = g.createSemantics();
+
+const block = (a, _1, b, _2, _3) => ({
+  type: "block",
+  bracket: a.sourceString,
+  values: b.ast
+    .filter((x) => !Array.isArray(x) && x.type === "attr")
+    .reduce((res, x) => ({ ...res, [x.key]: x.value }), {}),
+  content: b.ast
+    .filter((x) => Array.isArray(x))
+    .reduce((res, x) => [...res, ...x], []),
+  func: b.ast.find((x) => !Array.isArray(x) && x.type === "func"),
+  merge: b.ast.filter((x) => !Array.isArray(x) && x.type === "merge"),
+});
 
 const map = (a, _1, b, _3, c) => ({
   type: "map",
@@ -128,18 +152,9 @@ s.addAttribute("ast", {
 
   value: (a) => a.ast,
 
-  block: (a, _1, b, _2, _3) => ({
-    type: "block",
-    bracket: a.sourceString,
-    values: b.ast
-      .filter((x) => !Array.isArray(x) && x.type === "attr")
-      .reduce((res, x) => ({ ...res, [x.key]: x.value }), {}),
-    content: b.ast
-      .filter((x) => Array.isArray(x))
-      .reduce((res, x) => [...res, ...x], []),
-    func: b.ast.find((x) => !Array.isArray(x) && x.type === "func"),
-    merge: b.ast.filter((x) => !Array.isArray(x) && x.type === "merge"),
-  }),
+  block,
+
+  valueblock: block,
 
   item: (a) => a.ast,
 
@@ -160,12 +175,6 @@ s.addAttribute("ast", {
     body: c.ast,
   }),
 
-  merge: (a, _1, b, _2, c) => ({
-    type: "merge",
-    key: [a.ast, ...b.ast].map((x) => x.value),
-    value: c.ast,
-  }),
-
   params: (_1, _2, b, _3, _4) => b.ast,
 
   param_default: (a, _1, b) => ({ key: a.ast.value, def: b.ast }),
@@ -173,6 +182,12 @@ s.addAttribute("ast", {
   param_rest: (_1, a) => ({ key: a.ast.value, rest: true }),
 
   param_text: (a) => ({ key: a.ast.value }),
+
+  merge: (a, _1, b, _2, c) => ({
+    type: "merge",
+    key: [a.ast, ...b.ast].map((x) => x.value),
+    value: c.ast,
+  }),
 
   content: (a) => (Array.isArray(a.ast) ? a.ast : [a.ast]),
 
@@ -185,9 +200,6 @@ s.addAttribute("ast", {
     nodes: [a.ast, b.ast],
   }),
   pipe: (a) => a.ast,
-
-  join_join: map,
-  join: (a) => a.ast,
 
   not_not: (_1, _2, a) => ({ type: "map", func: "!", nodes: [a.ast] }),
   not: (a) => a.ast,
@@ -222,9 +234,20 @@ s.addAttribute("ast", {
   multi: (_1, a, _2) =>
     a.ast.length === 0 ? [{ type: "value", value: "" }] : a.ast,
 
+  multitemplate: (a) => ({ type: "template", nodes: a.ast }),
+
   multichunk: (a) => ({ type: "value", value: a.sourceString }),
 
   multichar: (a) => ({ type: "value", value: a.sourceString }),
+
+  template: (_1, a, _2) => ({
+    type: "template",
+    nodes: a.ast.length === 0 ? [{ type: "value", value: "" }] : a.ast,
+  }),
+
+  templatechunk: (a) => ({ type: "value", value: a.sourceString }),
+
+  templatechar: (a) => ({ type: "value", value: a.sourceString }),
 
   name: (a) => ({ type: "value", value: a.sourceString }),
 

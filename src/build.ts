@@ -5,6 +5,7 @@ import {
   print,
   resolve,
   resolveData,
+  resolvePush,
   resolveType,
   streamMap,
   toIndex,
@@ -43,9 +44,6 @@ const operators = {
   "/": numericMap((a, b) => a / b),
   "%": numericMap((a, b) => ((((a - 1) % b) + b) % b) + 1),
   "^": numericMap((a, b) => a ** b),
-  "&": dataMap((a, b) =>
-    a.type === "value" && b.type === "value" ? a.value + b.value : ""
-  ),
 };
 
 const pushableValue = (create, initial) => ({
@@ -64,7 +62,7 @@ const pushable = (create, initial) => {
           values: mapObject(initial.values, (v) => pushable(create, v)),
           content: initial.content.map((c) => pushable(create, c)),
         };
-  return result.push ? pushableValue(create, result) : result;
+  return pushableValue(create, result);
 };
 
 const nilValue = { type: "value", value: "" };
@@ -245,10 +243,13 @@ const build = (node, create, getVar) => {
     return {
       type: "stream",
       value: create((_, get) => {
-        const push = node.key.slice(1).reduce(
-          (res, k) => resolveData(res.values[k], (x) => get(x, true)),
-          resolveData(dest, (x) => get(x, true))
-        ).push;
+        const destStream = node.key
+          .slice(1)
+          .reduce(
+            (res, k) => resolveData(res, (x) => get(x, true))?.values?.[k],
+            dest
+          );
+        const push = resolvePush(destStream, get).push;
         if (push) {
           const wrapped = {
             type: "stream",
@@ -268,6 +269,19 @@ const build = (node, create, getVar) => {
   }
 
   const args = node.nodes.map((n) => build(n, create, getVar));
+  if (node.type === "template") {
+    return {
+      type: "stream",
+      value: create(
+        streamMap((get) => {
+          const values = args.map((a) => resolveType(a, get));
+          return values.every((v) => v.type === "value")
+            ? { type: "value", value: values.map((v) => v.value).join("") }
+            : nilValue;
+        })
+      ),
+    };
+  }
   if (node.type === "pipe") {
     return {
       type: "stream",

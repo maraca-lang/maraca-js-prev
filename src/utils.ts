@@ -24,6 +24,12 @@ export const toIndex = (v: string) => {
 export const isNil = (d) => d.type === "value" && !d.value;
 
 const nilValue = { type: "value", value: "" };
+export const resolvePush = (data, get) => {
+  const d = data || nilValue;
+  if (d.push) return d;
+  if (d.type === "stream") return resolvePush(get(d.value), get);
+  return d;
+};
 export const resolveType = (data, get) => {
   const d = data || nilValue;
   if (d.type === "stream") return resolveType(get(d.value), get);

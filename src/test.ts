@@ -17,7 +17,7 @@ const script = `
 {
   map=<(
     inline
-    size=20 height="1.5" font=Arial style strike color
+    size=20 height="1.5" font=Arial bold italic strike color
     pad fill cursor
     input placeholder
     hover focus click
@@ -32,16 +32,18 @@ const script = `
         focus+=(@onblur | "")
         click+=(@onclick | true)
         style=<
-          fontSize=(@size & "px")
-          lineHeight=[@height (@height & [(@height > 3) "px"])]
-          fontFamily=@font
-          =(@fontStyles.@textStyle)
+          "font-size"="{@size}px"
+          "line-height"=[@height "{@height}[(@height > 3) "px"]"]
+          "font-family"=@font
+          "font-weight"=[@bold bold]
+          "font-style"=[@italic italic]
           padding=@pad
           color=@color
           background=@fill
           cursor=@cursor
           outline=none
           "text-decoration"=[@strike "line-through"]
+          "user-select"=[(@cursor = pointer) none]
         >
       >
       [
@@ -64,9 +66,9 @@ const script = `
           <div
             =@base
             <div
-              style=<padding="1px 0" minHeight=(@size & "px")>
+              style=<padding="1px 0" "min-height"="{@size}px">
               <div
-                style=<marginTop=(-@gap & "px") marginBottom=(-@gap & "px")>
+                style=<"margin-top"="{(-@gap)}px" "margin-bottom"="{(-@gap)}px">
                 =@content
               >
             >
@@ -81,7 +83,7 @@ const script = `
       newText=""
       tasks=<<text=X done="">>
       <
-        <size=30 style=bold Todos>
+        <size=30 bold=true Todos>
         <
           input=true
           placeholder="Enter new task..."
@@ -132,21 +134,6 @@ const library = {
     value: fromJs((value) =>
       fromJs(value.content.some((x) => x.type === "value"))
     ),
-  },
-  fontStyles: {
-    type: "built",
-    value: fromJs((value) => {
-      if (isNil(value)) return { type: "block", values: {}, content: [] };
-      const values = {
-        fontWeight: fromJs("normal"),
-        fontStyle: fromJs("normal"),
-      } as any;
-      for (const v of (toJs(value, "string") || "").split(" ")) {
-        if (v === "bold") values.fontWeight = fromJs("bold");
-        if (v === "italic") values.fontStyle = fromJs("italic");
-      }
-      return { type: "block", values, content: [] };
-    }),
   },
 };
 
