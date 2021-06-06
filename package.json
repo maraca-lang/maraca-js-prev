@@ -1,7 +1,6 @@
 {
-  "name": "maraca-new",
-  "version": "1.0.0",
-  "main": "index.js",
+  "name": "maraca",
+  "version": "0.9.0",
   "license": "MIT",
   "dependencies": {
     "ohm-js": "^15.3.0",

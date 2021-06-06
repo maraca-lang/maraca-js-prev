@@ -20,7 +20,7 @@ const script = `
     size=20 height="1.5" font=Arial bold italic strike color
     pad fill cursor
     input placeholder
-    hover focus click
+    hover focus click key
     *other
   )=>
     {
@@ -31,13 +31,14 @@ const script = `
         focus+=(@onfocus | true)
         focus+=(@onblur | "")
         click+=(@onclick | true)
+        key+=(@onkeydown)
         style=<
           "font-size"="{@size}px"
           "line-height"=[@height "{@height}[(@height > 3) "px"]"]
           "font-family"=@font
           "font-weight"=[@bold bold]
           "font-style"=[@italic italic]
-          padding=@pad
+          padding="{@pad}px"
           color=@color
           background=@fill
           cursor=@cursor
@@ -87,20 +88,14 @@ const script = `
         input=true
         placeholder="Enter new task..."
         @newText
-        pad=10px
+        pad=10
         fill=[@focus orange =>gold]
-      >
-      <
-        fill=red
-        pad=10px
-        cursor=pointer
-        "Add task"
-        tasks+=(@click | <=@tasks <text={@newText "hi"} done="">>)
-        newText+=(@click | "")
+        tasks+=((@key = Enter) | <=@tasks <text={@newText "hi"} done="">>)
+        newText+=((@key = Enter) | "")
       >
       @tasks.<(task)=>>
         <
-          pad=10px
+          pad=10
           cursor=pointer
           fill=[@hover lightblue]
           strike=@task.done

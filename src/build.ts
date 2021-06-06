@@ -269,6 +269,7 @@ const build = (node, create, getVar) => {
 
   const args = node.nodes.map((n) => build(n, create, getVar));
   if (node.type === "template") {
+    if (args.length === 1) return args[0];
     return {
       type: "stream",
       value: create(

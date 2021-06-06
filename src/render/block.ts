@@ -29,6 +29,7 @@ export default class Block {
           onmouseleave,
           onfocus,
           onblur,
+          onkeydown,
           ...props
         } = toJs(data, {
           value: () => "string",
@@ -37,6 +38,7 @@ export default class Block {
           onmouseleave: () => "boolean",
           onfocus: () => "boolean",
           onblur: () => "boolean",
+          onkeydown: () => "boolean",
           style: { "*": "string" },
           "*": "string",
         });
@@ -52,6 +54,7 @@ export default class Block {
             onmouseleave.push && (() => onmouseleave.push(fromJs(true))),
           onfocus: onfocus.push && (() => onfocus.push(fromJs(true))),
           onblur: onblur.push && (() => onblur.push(fromJs(true))),
+          onkeydown: onkeydown.push && ((e) => onkeydown.push(fromJs(e.key))),
         });
 
         const nodeChildren = this.children.update(data.content.slice(1));
