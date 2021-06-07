@@ -239,7 +239,10 @@ s.addAttribute("ast", {
 
   multitemplate: (a) => ({ type: "template", nodes: a.ast }),
 
-  multichunk: (a) => ({ type: "value", value: a.sourceString }),
+  multichunk: (a) => ({
+    type: "value",
+    value: a.sourceString.replace(/\\([\s\S])/g, (_, m) => m),
+  }),
 
   multichar: (a) => ({ type: "value", value: a.sourceString }),
 
@@ -248,7 +251,10 @@ s.addAttribute("ast", {
     nodes: a.ast.length === 0 ? [{ type: "value", value: "" }] : a.ast,
   }),
 
-  templatechunk: (a) => ({ type: "value", value: a.sourceString }),
+  templatechunk: (a) => ({
+    type: "value",
+    value: a.sourceString.replace(/\\([\s\S])/g, (_, m) => m),
+  }),
 
   templatechar: (a) => ({ type: "value", value: a.sourceString }),
 
@@ -258,6 +264,7 @@ s.addAttribute("ast", {
 
   listOf: (a) => a.ast,
   nonemptyListOf: (a, _1, b) => [a.ast, ...b.ast],
+  emptyListOf: () => [],
 });
 
 export default (script) => {

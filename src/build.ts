@@ -30,7 +30,7 @@ const operators = {
   ">=": numericMap((a, b) => a >= b),
   "<": numericMap((a, b) => a < b),
   ">": numericMap((a, b) => a > b),
-  "!": numericMap((a, b) => a.type !== b.type || a.value !== b.value),
+  "!": dataMap((a, b) => a.type !== b.type || a.value !== b.value),
   "=": ([s1, s2], get) => {
     const [t1, t2] = [resolveType(s1, get), resolveType(s2, get)];
     if (t1.type !== t2.type) return fromJs(false);
@@ -89,13 +89,22 @@ const buildFunc = ({ mode, params, body }, create, getVar) => {
       if (mode === "=>") {
         if (value.type === "value") return nilValue;
         if (mappedParams[index].rest) {
+          if (Object.keys(value.values).length === 0) {
+            const content = value.content.slice(mappedParams.length - 1);
+            return { type: "block", values: {}, content };
+          }
           const values = mapObject(value.values, (v, k) =>
             mappedParams.find((x) => !x.rest && x.key === k) ? undefined : v
           );
           return { type: "block", values, content: value.content };
         }
         if (value.values[name]) return value.values[name];
-        if (hasRest) return mappedParams[index].def;
+        if (hasRest) {
+          if (Object.keys(value.values).length === 0) {
+            return value.content[index] || mappedParams[index].def;
+          }
+          return mappedParams[index].def;
+        }
         const freeParams = mappedParams.filter((x) => !value.values[x.key]);
         const freeIndex = freeParams.findIndex((x) => x.key === name);
         return value.content[freeIndex] || freeParams[freeIndex].def;
@@ -141,8 +150,12 @@ const combineDot = (get, create, big, small) => {
       ],
     };
   }
-  return small.content.reduce((res, x, i) =>
-    build(big.func.body, create, big.func.buildGetVar(x, `${i + 1}`, res))
+  return small.content.reduce(
+    ...[
+      (res, x, i) =>
+        build(big.func.body, create, big.func.buildGetVar(x, `${i + 1}`, res)),
+      big.content[0],
+    ].filter((x) => x)
   );
 };
 
@@ -160,10 +173,10 @@ const captureUndefined = (node, getVar) => {
 };
 
 const build = (node, create, getVar) => {
-  if (typeof node === "function") {
-    return { type: "stream", value: create(node) };
-  }
-  if (node.type === "built") {
+  if (node.type === "library") {
+    if (typeof node.value === "function") {
+      return { type: "stream", value: create(node) };
+    }
     return node.value;
   }
   if (node.type === "block") {

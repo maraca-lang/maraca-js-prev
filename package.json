@@ -2,20 +2,13 @@
   "name": "maraca",
   "version": "0.9.0",
   "license": "MIT",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc"
+  },
   "dependencies": {
     "ohm-js": "^15.3.0",
     "ts-node": "^9.1.1",
     "typescript": "^4.1.3"
-  },
-  "scripts": {
-    "build": "tsc",
-    "dev": "webpack serve"
-  },
-  "devDependencies": {
-    "html-webpack-plugin": "^5.3.1",
-    "ts-loader": "^9.2.2",
-    "webpack": "^5.38.1",
-    "webpack-cli": "^4.7.0",
-    "webpack-dev-server": "^3.11.2"
   }
 }
