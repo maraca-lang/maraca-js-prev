@@ -33,13 +33,12 @@ export class SourceStream {
   listeners = new Set<any>();
   value = null;
 
-  constructor(queue: Queue, run) {
-    let firstUpdate = true;
-    run((v) => {
-      this.value = v;
-      if (!firstUpdate) queue.add(this.listeners);
-    });
-    firstUpdate = false;
+  constructor(queue: Queue, initial) {
+    const push = (v) => {
+      this.value = { ...v, push };
+      queue.add(this.listeners);
+    };
+    this.value = { ...initial, push };
   }
 
   addListener(x) {
@@ -65,16 +64,14 @@ export class Stream {
     this.start = () => {
       let firstUpdate = true;
       const disposers = [];
-      const update = run(
-        (v) => {
-          this.value = v;
-          if (!firstUpdate) {
-            if (this.onChange) this.onChange(v);
-            queue.add(this.listeners);
-          }
-        },
-        (d) => disposers.push(d)
-      );
+      const push = (v) => {
+        this.value = { push, ...v };
+        if (!firstUpdate) {
+          if (this.onChange) this.onChange(this.value);
+          queue.add(this.listeners);
+        }
+      };
+      const update = run(push, (d) => disposers.push(d));
 
       let active = new Set<any>();
       const get = (s) => {
@@ -132,8 +129,8 @@ class Creator {
     this.queue = queue;
     this.base = base;
   }
-  create = (run, source = false) => {
-    if (source) return new SourceStream(this.queue, run);
+  create = (run) => {
+    if (typeof run !== "function") return new SourceStream(this.queue, run);
     return new Stream(this.queue, [...this.base, this.counter++], run);
   };
   reset() {

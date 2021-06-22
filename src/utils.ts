@@ -26,18 +26,12 @@ export const isNil = (d) => d.type === "value" && !d.value;
 const nilValue = { type: "value", value: "" };
 export const resolveType = (data, get) => {
   const d = data || nilValue;
-  if (d.type === "stream") {
-    const result = resolveType(get(d.value), get);
-    return !result.push && d.push ? { push: d.push, ...result } : result;
-  }
+  if (d.type === "stream") return resolveType(get(d.value), get);
   return d;
 };
 export const resolveData = (data, get) => {
   const d = data || nilValue;
-  if (d.type === "stream") {
-    const result = resolveData(get(d.value), get);
-    return !result.push && d.push ? { push: d.push, ...result } : result;
-  }
+  if (d.type === "stream") return resolveData(get(d.value), get);
   if (d.type === "block") {
     if (d.merge) d.merge.map((s) => resolveType(s, get));
     let values = {};
