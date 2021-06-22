@@ -13,14 +13,15 @@ const script = `(@tick | 10)`;
 // const script = `<1 a=1 =<2 3 4 b=2>>`;
 
 const library = {
-  tick: (set) => {
+  tick: (set, onDispose) => {
     let count = 1;
     set({ type: "value", value: `${count++}` });
-    const interval = setInterval(
-      () => set({ type: "value", value: `${count++}` }),
-      1000
-    );
-    return (dispose) => dispose && clearInterval(interval);
+    const interval = setInterval(() => {
+      set({ type: "value", value: `${count++}` });
+    }, 1000);
+    onDispose(() => {
+      clearInterval(interval);
+    });
   },
 };
 

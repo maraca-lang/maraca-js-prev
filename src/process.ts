@@ -63,9 +63,8 @@ export class Stream {
   constructor(queue: Queue, index, run) {
     this.index = index;
     this.start = () => {
-      let active = new Set<any>();
-      const creator = new Creator(queue, index);
       let firstUpdate = true;
+      const disposers = [];
       const update = run(
         (v) => {
           this.value = v;
@@ -74,21 +73,24 @@ export class Stream {
             queue.add(this.listeners);
           }
         },
-        (s, snapshot) => {
-          s.addListener(this);
-          if (snapshot) s.removeListener(this);
-          else active.add(s);
-          return s.value;
-        },
-        (...args) => (creator.create as any)(...args)
+        (d) => disposers.push(d)
       );
-      if (update) update();
+
+      let active = new Set<any>();
+      const get = (s) => {
+        s.addListener(this);
+        active.add(s);
+        return s.value;
+      };
+      const creator = new Creator(queue, index);
+      if (update) update(get, creator.create);
       firstUpdate = false;
+
       this.update = () => {
         const prevActive = active;
         active = new Set();
         creator.reset();
-        if (update) update();
+        if (update) update(get, creator.create);
         for (const s of prevActive) {
           if (!active.has(s)) s.removeListener(this);
         }
@@ -97,7 +99,7 @@ export class Stream {
         queue.remove(this);
         for (const s of active.values()) s.removeListener(this);
         active = new Set();
-        if (update && update.length === 1) update(true);
+        disposers.forEach((d) => d());
       };
     };
   }
@@ -130,10 +132,10 @@ class Creator {
     this.queue = queue;
     this.base = base;
   }
-  create(run, source = false) {
+  create = (run, source = false) => {
     if (source) return new SourceStream(this.queue, run);
     return new Stream(this.queue, [...this.base, this.counter++], run);
-  }
+  };
   reset() {
     this.counter = 0;
   }
@@ -148,16 +150,17 @@ class StaticStream {
   }
   get() {
     if (this.hasRun) return this.value;
+    const disposers = [];
     const update = this.run(
       (v) => {
         this.value = v;
       },
-      (s) => s.get(),
-      (run) => new StaticStream(run)
+      (d) => disposers.push(d)
     );
+    const get = (s) => s.get();
     if (update) {
-      update();
-      if (update.length === 1) update(true);
+      update(get, (run) => new StaticStream(run));
+      disposers.forEach((d) => d());
     }
     this.hasRun = true;
     return this.value;
@@ -169,8 +172,8 @@ export default (build, output?) => {
     return build((run) => new StaticStream(run)).get();
   }
   const queue = new Queue();
-  const creator = new Creator(queue, []) as any;
-  const stream = build((...args) => creator.create(...args));
+  const creator = new Creator(queue, []);
+  const stream = build(creator.create);
   stream.addListener(output);
   output(stream.value);
   return () => stream.removeListener();

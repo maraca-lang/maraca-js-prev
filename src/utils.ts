@@ -155,7 +155,7 @@ export const toJs = (data = { type: "value", value: "" } as any, config) => {
   return undefined;
 };
 
-export const streamMap = (map) => (set, get) => () => set(map(get));
+export const streamMap = (map) => (set) => (get) => set(map(get));
 
 export const sortMultiple = <T = any>(
   items1: T[],
