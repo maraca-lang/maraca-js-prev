@@ -45,10 +45,13 @@ const operators = {
   "^": numericMap((a, b) => a ** b),
 };
 
-const pushableValue = (create, initial) =>
-  initial.type === "stream"
-    ? initial
-    : { type: "stream", value: create(initial) };
+const pushableValue = (create, initial) => {
+  if (initial.type === "stream") {
+    initial.value.pushable = true;
+    return initial;
+  }
+  return { type: "stream", value: create(initial) };
+};
 const pushable = (create, initial) => {
   const result =
     initial.type === "value"

@@ -58,6 +58,7 @@ export class Stream {
   update;
   stop;
   onChange;
+  pushable;
 
   constructor(queue: Queue, index, run) {
     this.index = index;
@@ -65,7 +66,7 @@ export class Stream {
       let firstUpdate = true;
       const disposers = [];
       const push = (v) => {
-        this.value = { push, ...v };
+        this.value = this.pushable ? { ...v, push } : v;
         if (!firstUpdate) {
           if (this.onChange) this.onChange(this.value);
           queue.add(this.listeners);
