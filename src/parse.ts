@@ -35,7 +35,7 @@ const grammar = `Maraca {
 
   param
     = text "=" value -- default
-    | "*" text -- rest
+    | ("**" | "*") text -- rest
     | text -- text
 
   merge
@@ -185,7 +185,7 @@ s.addAttribute("ast", {
 
   param_default: (a, _1, b) => ({ key: a.ast.value, def: b.ast }),
 
-  param_rest: (_1, a) => ({ key: a.ast.value, rest: true }),
+  param_rest: (a, b) => ({ key: b.ast.value, rest: a.sourceString }),
 
   param_text: (a) => ({ key: a.ast.value }),
 

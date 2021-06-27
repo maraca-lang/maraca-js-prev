@@ -76,7 +76,6 @@ const buildFunc = ({ mode, params, body }, create, getVar) => {
       ...x,
       def: x.def ? build(x.def, create, getVar) : nilValue,
     }));
-  const hasRest = Array.isArray(params) && params.some((x) => x.rest);
   return {
     mode: `${mode === "=>" && Array.isArray(params) ? "()" : ""}${mode}`,
     body,
@@ -89,20 +88,19 @@ const buildFunc = ({ mode, params, body }, create, getVar) => {
       if (mode === "=>") {
         if (value.type === "value") return nilValue;
         if (mappedParams[index].rest) {
-          if (Object.keys(value.values).length === 0) {
-            const content = value.content.slice(mappedParams.length - 1);
-            return { type: "block", values: {}, content };
-          }
           const values = mapObject(value.values, (v, k) =>
             mappedParams.find((x) => !x.rest && x.key === k) ? undefined : v
           );
+          if (mappedParams[index].rest === "*") {
+            const content = value.content.slice(
+              mappedParams.length - 1 - Object.keys(values).length
+            );
+            return { type: "block", values, content };
+          }
           return { type: "block", values, content: value.content };
         }
         if (value.values[name]) return value.values[name];
-        if (hasRest) {
-          if (Object.keys(value.values).length === 0) {
-            return value.content[index] || mappedParams[index].def;
-          }
+        if (mappedParams.some((x) => x.rest == "**")) {
           return mappedParams[index].def;
         }
         const freeParams = mappedParams.filter((x) => !value.values[x.key]);
