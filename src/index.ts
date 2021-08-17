@@ -1,40 +1,42 @@
 import build from "./build";
-import parse from "./parse";
+import parse, { createNode } from "./parse";
 import process from "./process";
-import { mapObject, resolve, streamMap } from "./utils";
+import { fromJs, resolve, streamMap } from "./utils";
 
 export { fromJs, isNil, toJs } from "./utils";
 
 const parseSource = (source) => {
   if (typeof source === "string") return parse(source);
-  return {
-    type: "block",
-    bracket: "<",
-    values: mapObject(source, (v) => parseSource(v)),
-    content: [],
-    merge: [],
-  };
+  return createNode(
+    "block",
+    Object.keys(source).map((k) =>
+      createNode("attr", [parseSource(source[k])], { key: fromJs(k) })
+    ),
+    { bracket: fromJs("<") }
+  );
 };
 
-export default (source, library, onData) => {
-  return process((create) => {
+export default (source, library = {}, onData?) =>
+  process((create) => {
     const builtLibrary = Object.keys(library).reduce(
       (res, k) => ({
         ...res,
-        [k]: build({ type: "library", value: library[k] }, create, null),
+        [k]:
+          typeof library[k] === "function"
+            ? { type: "stream", value: create(library[k]) }
+            : library[k],
       }),
       {}
     );
     const result = build(
       typeof source === "string"
         ? parseSource(source)
-        : {
-            type: "dot",
-            nodes: [parseSource(source), { type: "value", value: "" }],
-          },
+        : createNode("dot", [
+            parseSource(source),
+            { type: "value", value: "" },
+          ]),
       create,
       (name) => builtLibrary[name]
     );
     return create(streamMap((get) => resolve(result, get)));
   }, onData);
-};

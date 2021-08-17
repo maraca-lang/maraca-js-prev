@@ -66,7 +66,18 @@ const pushable = (create, initial) => {
 
 const nilValue = { type: "value", value: "" };
 
-const buildFunc = ({ mode, params, body }, create, getVar) => {
+const buildFunc = (node, create, getVar) => {
+  const mode = node.values.mode.value;
+  const params =
+    node.values.params.type === "value"
+      ? node.values.params.value
+      : node.values.params.content.map((p) => ({
+          key: p.values.key?.value,
+          def: p.values.def,
+          rest: p.values.rest?.value,
+        }));
+  const body = node.content[0];
+
   if (mode === "=>" && !params) {
     return { mode, value: build(body, create, getVar) };
   }
@@ -158,39 +169,61 @@ const combineDot = (get, create, big, small) => {
 };
 
 const captureUndefined = (node, getVar) => {
-  if (typeof node !== "function") {
-    if (node.type === "var") {
-      getVar(node.name);
-    } else if (node.type === "merge") {
-      const dest = getVar(node.key[0]);
-      if (!(isNil(dest) && !dest.push)) captureUndefined(node.value, getVar);
-    } else if (node.nodes) {
-      node.nodes.map((n) => captureUndefined(n, getVar));
-    }
+  if (node.type === "var") {
+    getVar(node.name);
+  } else if (node.type === "merge") {
+    const dest = getVar(node.key[0]);
+    if (!(isNil(dest) && !dest.push)) captureUndefined(node.value, getVar);
+  } else if (node.nodes) {
+    node.nodes.map((n) => captureUndefined(n, getVar));
   }
 };
 
 const build = (node, create, getVar) => {
-  if (node.type === "library") {
-    if (typeof node.value === "function") {
-      return { type: "stream", value: create(node.value) };
-    }
-    return node.value;
-  }
-  if (node.type === "block") {
+  if (node.type === "value") return node;
+
+  const type = node.values.type.value;
+
+  if (type === "block") {
+    const bracket = node.values.bracket.value;
+    const items = {
+      values: node.content
+        .filter((x) => x.values?.type.value === "attr")
+        .reduce(
+          (res, x) => ({ ...res, [x.values.key.value]: x.content[0] }),
+          {}
+        ),
+      func: node.content.find((x) => x.values?.type.value === "func"),
+      merge: node.content.filter((x) => x.values?.type.value === "merge"),
+      content: node.content
+        .filter(
+          (x) => !["attr", "func", "merge"].includes(x.values?.type.value)
+        )
+        .reduce(
+          (res, x) =>
+            x.values?.type.value === "multi"
+              ? [...res, ...x.content]
+              : [...res, x],
+          []
+        ),
+    };
+
     let values = {};
     const newGetVar = (
       name,
-      captureUndef = node.bracket === "<" ? true : undefined
+      captureUndef = bracket === "<" ? true : undefined
     ) => {
       if (values[name]) return values[name];
-      if (node.values[name]) {
+      if (items.values[name]) {
         return (values[name] = pushableValue(
           create,
           build(
-            node.values[name],
+            items.values[name],
             create,
-            node.values[name].type === "block" && node.values[name].func
+            items.values[name].values?.type.value === "block" &&
+              items.values[name].content.some(
+                (x) => x.values?.type.value === "func"
+              )
               ? newGetVar
               : (n, c) => (n === name ? getVar(n, c) : newGetVar(n, c))
           )
@@ -201,23 +234,21 @@ const build = (node, create, getVar) => {
       return (values[name] = pushableValue(create, nilValue));
     };
 
-    node.content.forEach((c) =>
-      captureUndefined(Array.isArray(c) ? c[0] : c, newGetVar)
-    );
-    node.merge.forEach((x) => captureUndefined(x, newGetVar));
+    items.content.forEach((c) => captureUndefined(c, newGetVar));
+    items.merge.forEach((x) => captureUndefined(x, newGetVar));
 
-    for (const name of Object.keys(node.values)) newGetVar(name);
-    const content = node.content.map((c) =>
-      Array.isArray(c)
-        ? [build(c[0], create, newGetVar)]
+    for (const name of Object.keys(items.values)) newGetVar(name);
+    const content = items.content.map((c) =>
+      c.values?.type.value === "unpack"
+        ? [build(c.content[0], create, newGetVar)]
         : build(c, create, newGetVar)
     );
-    const merge = node.merge.map((x) => build(x, create, newGetVar));
+    const merge = items.merge.map((x) => build(x, create, newGetVar));
     const func =
-      node.func &&
-      buildFunc(node.func, create, (name) => newGetVar(name, false));
+      items.func &&
+      buildFunc(items.func, create, (name) => newGetVar(name, false));
 
-    if (node.bracket === "<") {
+    if (bracket === "<") {
       return { type: "block", values, content, func, merge };
     }
     return {
@@ -232,24 +263,22 @@ const build = (node, create, getVar) => {
         }, []);
         for (const c of unpacked) {
           v = resolveType(c, get);
-          if (isNil(v) === (node.bracket === "[")) break;
+          if (isNil(v) === (bracket === "[")) break;
         }
         if (isNil(v) && func?.value) v = func.value;
         set(v);
       }),
     };
   }
-  if (node.type === "var") {
-    return getVar(node.name);
-  }
-  if (node.type === "value") {
-    return node;
+  if (type === "var") {
+    return getVar(node.values.name.value);
   }
 
-  if (node.type === "merge") {
-    const dest = getVar(node.key[0]);
+  if (type === "merge") {
+    const key = node.values.key.content.map((x) => x.value);
+    const dest = getVar(key[0]);
     if (isNil(dest) && !dest.push) return nilValue;
-    const value = build(node.value, create, getVar);
+    const value = build(node.content[0], create, getVar);
     const wrappedValue = {
       type: "stream",
       value: create(streamMap((get) => resolve(value, get))),
@@ -258,7 +287,7 @@ const build = (node, create, getVar) => {
       type: "stream",
       value: create(
         streamMap((get) => {
-          const destStream = node.key
+          const destStream = key
             .slice(1)
             .reduce((res, k) => resolveData(res, get)?.values?.[k], dest);
           return resolveType(destStream, get);
@@ -280,8 +309,8 @@ const build = (node, create, getVar) => {
     };
   }
 
-  const args = node.nodes.map((n) => build(n, create, getVar));
-  if (node.type === "template") {
+  const args = node.content.map((n) => build(n, create, getVar));
+  if (type === "template") {
     if (args.length === 1) return args[0];
     return {
       type: "stream",
@@ -295,7 +324,7 @@ const build = (node, create, getVar) => {
       ),
     };
   }
-  if (node.type === "pipe") {
+  if (type === "pipe") {
     const wrapped = {
       type: "stream",
       value: create(streamMap((get) => resolve(args[0], get))),
@@ -314,14 +343,16 @@ const build = (node, create, getVar) => {
       }),
     };
   }
-  if (node.type === "map") {
-    const map = (args.length === 1 ? unaryOperators : operators)[node.func];
+  if (type === "map") {
+    const map = (args.length === 1 ? unaryOperators : operators)[
+      node.values.func.value
+    ];
     return {
       type: "stream",
       value: create(streamMap((get) => map(args, get))),
     };
   }
-  if (node.type === "dot") {
+  if (type === "dot") {
     return {
       type: "stream",
       value: create((set) => {

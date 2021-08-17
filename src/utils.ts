@@ -64,7 +64,7 @@ export const resolve = (data, get) => {
   return d;
 };
 
-export const fromJs = (value) => {
+export const fromJs = (value, deep = true) => {
   if (value === 0) return { type: "value", value: "0" };
   if (!value) return { type: "value", value: "" };
   if (value === true) return { type: "value", value: "true" };
@@ -81,7 +81,7 @@ export const fromJs = (value) => {
   if (Object.prototype.toString.call(value) === "[object Object]") {
     return {
       type: "block",
-      values: mapObject(value, (v) => fromJs(v)),
+      values: deep ? mapObject(value, (v) => fromJs(v)) : value,
       content: [],
     };
   }
@@ -89,7 +89,7 @@ export const fromJs = (value) => {
     return {
       type: "block",
       values: {},
-      content: value.map((v) => fromJs(v)),
+      content: deep ? value.map((v) => fromJs(v)) : value,
     };
   }
   return { type: "value", value: "" };
