@@ -144,7 +144,12 @@ class StaticStream {
   value = null;
   hasRun = false;
   constructor(run) {
-    this.run = run;
+    if (typeof run === "function") {
+      this.run = run;
+    } else {
+      this.value = run;
+      this.hasRun = true;
+    }
   }
   get() {
     if (this.hasRun) return this.value;

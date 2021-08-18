@@ -56,6 +56,7 @@ const grammar = `Maraca {
     | expr
     | not
     | minus
+    | size
     | var
     | name
     | escape
@@ -88,6 +89,9 @@ const grammar = `Maraca {
 
   minus
     = "-" value
+  
+  size
+    = "#" value
 
   var
     = "@" text
@@ -192,7 +196,7 @@ s.addAttribute("ast", {
 
   valuebase: (a) => a.ast,
 
-  expr: (_1, _2, a, _3, _4) => a.ast,
+  expr: (_1, _2, a, _3, _4) => createNode("expr", [a.ast]),
 
   pipe_pipe: (a, _1, _2, _3, b) => createNode("pipe", [a.ast, b.ast]),
   pipe: (a) => a.ast,
@@ -212,6 +216,8 @@ s.addAttribute("ast", {
   not: (_1, a) => createNode("map", [a.ast], { func: fromJs("!") }),
 
   minus: (_1, a) => createNode("map", [a.ast], { func: fromJs("-") }),
+
+  size: (_1, a) => createNode("size", [a.ast]),
 
   var: (_1, a) => createNode("var", [], { name: fromJs(a.ast.value) }),
 

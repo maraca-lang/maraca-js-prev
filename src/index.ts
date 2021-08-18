@@ -4,6 +4,7 @@ import process from "./process";
 import { fromJs, resolve, streamMap } from "./utils";
 
 export { fromJs, isNil, toJs } from "./utils";
+export { default as parse } from "./parse";
 
 const parseSource = (source) => {
   if (typeof source === "string") return parse(source);

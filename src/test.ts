@@ -1,6 +1,7 @@
 import maraca from "./index";
 
 const script = `(@tick | 10)`;
+// const script = `#<1 2 a=2 b=4>`;
 // const script = `<div @tick 2 3 \\@>`;
 // const script = `{x=1 <div <input value=@x> @x>}`;
 // const script = `<x=1 "test<blah>more" woop <x>>`;
@@ -19,9 +20,7 @@ const library = {
     const interval = setInterval(() => {
       set({ type: "value", value: `${count++}` });
     }, 1000);
-    onDispose(() => {
-      clearInterval(interval);
-    });
+    onDispose(() => clearInterval(interval));
   },
 };
 

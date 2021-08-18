@@ -310,6 +310,23 @@ const build = (node, create, getVar) => {
   }
 
   const args = node.content.map((n) => build(n, create, getVar));
+  if (type === "expr") {
+    return args[0];
+  }
+  if (type === "size") {
+    return {
+      type: "stream",
+      value: create(
+        streamMap((get) => {
+          const value = resolveData(args[0], get);
+          if (value.type === "value") return nilValue;
+          return fromJs(
+            Object.keys(value.values).length + value.content.length
+          );
+        })
+      ),
+    };
+  }
   if (type === "template") {
     if (args.length === 1) return args[0];
     return {
