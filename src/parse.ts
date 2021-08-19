@@ -8,7 +8,7 @@ const grammar = `Maraca {
     = space* value space*
 
   value
-    = value "." valueinner -- dot
+    = value space* "." space* valueinner -- dot
     | valueinner
   
   valueinner
@@ -152,7 +152,7 @@ const map = (a, _1, b, _3, c) =>
 s.addAttribute("ast", {
   start: (_1, a, _2) => a.ast,
 
-  value_dot: (a, _1, b) => createNode("dot", [a.ast, b.ast]),
+  value_dot: (a, _1, _2, _3, b) => createNode("dot", [a.ast, b.ast]),
   value: (a) => a.ast,
 
   valueinner: (a) => a.ast,

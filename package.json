@@ -4,7 +4,8 @@
   "license": "MIT",
   "main": "lib/index.js",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test": "npm run build && node lib/test.js"
   },
   "dependencies": {
     "ohm-js": "^15.5.0",
