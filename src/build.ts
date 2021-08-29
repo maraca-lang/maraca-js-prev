@@ -334,9 +334,12 @@ const build = (node, create, getVar) => {
       value: create(
         streamMap((get) => {
           const values = args.map((a) => resolveType(a, get));
-          return values.every((v) => v.type === "value")
-            ? { type: "value", value: values.map((v) => v.value).join("") }
-            : nilValue;
+          return {
+            type: "value",
+            value: values
+              .map((v) => (v.type === "value" ? v.value : ""))
+              .join(""),
+          };
         })
       ),
     };

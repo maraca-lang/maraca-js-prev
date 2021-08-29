@@ -5,7 +5,7 @@ import { fromJs } from "./utils";
 const grammar = `Maraca {
 
   start
-    = space* value space*
+    = space* value? space*
 
   value
     = value space* "." space* valueinner -- dot
@@ -150,7 +150,7 @@ const map = (a, _1, b, _3, c) =>
   createNode("map", [a.ast, c.ast], { func: fromJs(b.sourceString) });
 
 s.addAttribute("ast", {
-  start: (_1, a, _2) => a.ast,
+  start: (_1, a, _2) => a.ast[0] || { type: "value", value: "" },
 
   value_dot: (a, _1, _2, _3, b) => createNode("dot", [a.ast, b.ast]),
   value: (a) => a.ast,
@@ -236,7 +236,11 @@ s.addAttribute("ast", {
 
   multichunk: (a) => ({
     type: "value",
-    value: a.sourceString.replace(/\\([\s\S])/g, (_, m) => m),
+    value: a.sourceString
+      .replace(/\s*\\\s*\n\s*/g, "�")
+      .replace(/\\([\s\S])/g, (_, m) => m)
+      .replace(/\s+/g, " ")
+      .replace(/�/g, "\n"),
   }),
 
   multichar: (_) => null,
@@ -248,7 +252,11 @@ s.addAttribute("ast", {
 
   templatechunk: (a) => ({
     type: "value",
-    value: a.sourceString.replace(/\\([\s\S])/g, (_, m) => m),
+    value: a.sourceString
+      .replace(/\s*\\\s*\n\s*/g, "�")
+      .replace(/\\([\s\S])/g, (_, m) => m)
+      .replace(/\s+/g, " ")
+      .replace(/�/g, "\n"),
   }),
 
   templatechar: (_) => null,
