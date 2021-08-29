@@ -66,6 +66,30 @@ const pushable = (create, initial) => {
 
 const nilValue = { type: "value", value: "" };
 
+const getParamValue = (value, params, key) => {
+  if (value.type === "value") return nilValue;
+  const index = params.findIndex((x) => x.key === key);
+  if (params[index].rest) {
+    const values = mapObject(value.values, (v, k) =>
+      params.find((x) => !x.rest && x.key === k) ? undefined : v
+    );
+    if (params[index].rest === "*") {
+      const content = value.content.slice(
+        params.length - 1 - Object.keys(values).length
+      );
+      return { type: "block", values, content };
+    }
+    return { type: "block", values, content: value.content };
+  }
+  if (value.values[key]) return value.values[key];
+  if (params.some((x) => x.rest == "**")) {
+    return params[index].def;
+  }
+  const freeParams = params.filter((x) => !value.values[x.key]);
+  const freeIndex = freeParams.findIndex((x) => x.key === key);
+  return value.content[freeIndex] || freeParams[freeIndex].def;
+};
+
 const buildFunc = (node, create, getVar) => {
   const mode = node.values.mode.value;
   const params =
@@ -97,26 +121,7 @@ const buildFunc = (node, create, getVar) => {
       const index = mappedParams.findIndex((x) => x.key === name);
       if (index === -1) return getVar(name);
       if (mode === "=>") {
-        if (value.type === "value") return nilValue;
-        if (mappedParams[index].rest) {
-          const values = mapObject(value.values, (v, k) =>
-            mappedParams.find((x) => !x.rest && x.key === k) ? undefined : v
-          );
-          if (mappedParams[index].rest === "*") {
-            const content = value.content.slice(
-              mappedParams.length - 1 - Object.keys(values).length
-            );
-            return { type: "block", values, content };
-          }
-          return { type: "block", values, content: value.content };
-        }
-        if (value.values[name]) return value.values[name];
-        if (mappedParams.some((x) => x.rest == "**")) {
-          return mappedParams[index].def;
-        }
-        const freeParams = mappedParams.filter((x) => !value.values[x.key]);
-        const freeIndex = freeParams.findIndex((x) => x.key === name);
-        return value.content[freeIndex] || freeParams[freeIndex].def;
+        return getParamValue(value, mappedParams, name);
       }
       return [result, value, key && { type: "value", value: key }].filter(
         (x) => x
@@ -187,17 +192,44 @@ const build = (node, create, getVar) => {
   if (type === "block") {
     const bracket = node.values.bracket.value;
     const items = {
-      values: node.content
-        .filter((x) => x.values?.type.value === "attr")
-        .reduce(
-          (res, x) => ({ ...res, [x.values.key.value]: x.content[0] }),
-          {}
-        ),
+      attrs: node.content
+        .filter((x) => x.values?.type.value === "attrs")
+        .map((x) => x.content[0]),
+      values: {
+        ...node.content
+          .filter((x) => x.values?.type.value === "attr")
+          .reduce(
+            (res, x) => ({ ...res, [x.values.key.value]: x.content[0] }),
+            {}
+          ),
+        ...node.content
+          .filter((x) => x.values?.type.value === "attrs")
+          .reduce((res, x, i) => {
+            return {
+              ...res,
+              ...x.values.key.content.reduce((r, y) => {
+                return {
+                  ...r,
+                  [y.values.key.value]: fromJs(
+                    {
+                      type: fromJs("attrs"),
+                      index: i,
+                      key: y.values.key,
+                      params: x.values.key,
+                    },
+                    false
+                  ),
+                };
+              }, {}),
+            };
+          }, {}),
+      },
       func: node.content.find((x) => x.values?.type.value === "func"),
       merge: node.content.filter((x) => x.values?.type.value === "merge"),
       content: node.content
         .filter(
-          (x) => !["attr", "func", "merge"].includes(x.values?.type.value)
+          (x) =>
+            !["attr", "attrs", "func", "merge"].includes(x.values?.type.value)
         )
         .reduce(
           (res, x) =>
@@ -208,11 +240,16 @@ const build = (node, create, getVar) => {
         ),
     };
 
+    let attrs = {};
     let values = {};
     const newGetVar = (
       name,
       captureUndef = bracket === "<" ? true : undefined
     ) => {
+      if (typeof name === "number") {
+        if (attrs[name]) return attrs[name];
+        return (attrs[name] = build(items.attrs[name], create, newGetVar));
+      }
       if (values[name]) return values[name];
       if (items.values[name]) {
         return (values[name] = pushableValue(
@@ -274,6 +311,23 @@ const build = (node, create, getVar) => {
     return getVar(node.values.name.value);
   }
 
+  if (type === "attrs") {
+    const base = getVar(node.values.index);
+    const params = node.values.params.content.map((p) => ({
+      key: p.values.key?.value,
+      def: p.values.def ? build(p.values.def, create, getVar) : nilValue,
+      rest: p.values.rest?.value,
+    }));
+    return {
+      type: "stream",
+      value: create(
+        streamMap((get) => {
+          const value = resolveData(base, get);
+          return getParamValue(value, params, node.values.key.value);
+        })
+      ),
+    };
+  }
   if (type === "merge") {
     const key = node.values.key.content.map((x) => x.value);
     const dest = getVar(key[0]);

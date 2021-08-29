@@ -44,7 +44,8 @@ const grammar = `Maraca {
     = listOf<text, "."> "+=" space* value
 
   attr
-    = text? "=" space* value
+    = params "=" space* value -- multi
+    | text? "=" space* value -- single
 
   content
     = multi
@@ -187,7 +188,9 @@ s.addAttribute("ast", {
   merge: (a, _1, _2, b) =>
     createNode("merge", [b.ast], { key: fromJs(a.ast.map((x) => x.value)) }),
 
-  attr: (a, _1, _2, b) =>
+  attr_multi: (a, _1, _2, b) =>
+    createNode("attrs", [b.ast], { key: fromJs(a.ast, false) }),
+  attr_single: (a, _1, _2, b) =>
     a.ast[0]
       ? createNode("attr", [b.ast], { key: fromJs(a.ast[0].value) })
       : createNode("unpack", [b.ast]),
