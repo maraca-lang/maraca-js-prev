@@ -8,13 +8,15 @@ export { default as parse } from "./parse";
 
 const parseSource = (source) => {
   if (typeof source === "string") return parse(source);
-  return createNode(
+  const block = createNode(
     "block",
     Object.keys(source).map((k) =>
       createNode("attr", [parseSource(source[k])], { key: fromJs(k) })
     ),
     { bracket: fromJs("<") }
   );
+  if (!source[""]) return block;
+  return createNode("dot", [block, { type: "value", value: "" }]);
 };
 
 export default (source, library = {}, onData?) =>
@@ -30,12 +32,7 @@ export default (source, library = {}, onData?) =>
       {}
     );
     const result = build(
-      typeof source === "string"
-        ? parseSource(source)
-        : createNode("dot", [
-            parseSource(source),
-            { type: "value", value: "" },
-          ]),
+      parseSource(source),
       create,
       (name) => builtLibrary[name]
     );

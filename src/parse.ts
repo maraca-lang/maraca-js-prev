@@ -30,22 +30,26 @@ const grammar = `Maraca {
 
   func
     = params ("=>>>" | "=>>" | "=>") space* value -- multi
-    | text? "=>" space* value -- single
+    | name? "=>" space* value -- single
 
   params
     = "(" space* listOf<param, space+> space* ")"
 
   param
-    = text "=" value -- default
-    | ("**" | "*") text -- rest
-    | text -- text
+    = name "=" value -- default
+    | ("**" | "*") name -- rest
+    | name -- name
 
   merge
-    = listOf<text, "."> "+=" space* value
+    = key "+=" space* value
 
   attr
     = params "=" space* value -- multi
-    | text? "=" space* value -- single
+    | key? "=" space* value -- single
+
+  key
+    = string
+    | name
 
   content
     = multi
@@ -59,7 +63,6 @@ const grammar = `Maraca {
     | minus
     | size
     | var
-    | name
     | escape
 
   expr
@@ -94,12 +97,11 @@ const grammar = `Maraca {
   size
     = "#" value
 
-  var
-    = "@" text
+  num
+    = digit+
 
-  text
-    = string
-    | name
+  var
+    = name
 
   string
     = "\\"" (stringchar | escape)* "\\""
@@ -183,10 +185,9 @@ s.addAttribute("ast", {
 
   param_rest: (a, b) => fromJs({ key: b.ast.value, rest: a.sourceString }),
 
-  param_text: (a) => fromJs({ key: a.ast.value }),
+  param_name: (a) => fromJs({ key: a.ast.value }),
 
-  merge: (a, _1, _2, b) =>
-    createNode("merge", [b.ast], { key: fromJs(a.ast.map((x) => x.value)) }),
+  merge: (a, _1, _2, b) => createNode("merge", [b.ast], { key: a.ast }),
 
   attr_multi: (a, _1, _2, b) =>
     createNode("attrs", [b.ast], { key: fromJs(a.ast, false) }),
@@ -194,6 +195,8 @@ s.addAttribute("ast", {
     a.ast[0]
       ? createNode("attr", [b.ast], { key: fromJs(a.ast[0].value) })
       : createNode("unpack", [b.ast]),
+
+  key: (a) => a.ast,
 
   content: (a) => a.ast,
 
@@ -222,9 +225,8 @@ s.addAttribute("ast", {
 
   size: (_1, a) => createNode("size", [a.ast]),
 
-  var: (_1, a) => createNode("var", [], { name: fromJs(a.ast.value) }),
-
-  text: (a) => a.ast,
+  var: (a) =>
+    /^\d+$/.test(a.ast.value) ? a.ast : createNode("var", [], { name: a.ast }),
 
   string: (_1, a, _2) => ({ type: "value", value: a.sourceString }),
 

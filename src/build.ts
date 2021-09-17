@@ -329,24 +329,12 @@ const build = (node, create, getVar) => {
     };
   }
   if (type === "merge") {
-    const key = node.values.key.content.map((x) => x.value);
-    const dest = getVar(key[0]);
+    const dest = getVar(node.values.key.value);
     if (isNil(dest) && !dest.push) return nilValue;
     const value = build(node.content[0], create, getVar);
     const wrappedValue = {
       type: "stream",
       value: create(streamMap((get) => resolve(value, get))),
-    };
-    const wrappedDest = {
-      type: "stream",
-      value: create(
-        streamMap((get) => {
-          const destStream = key
-            .slice(1)
-            .reduce((res, k) => resolveData(res, get)?.values?.[k], dest);
-          return resolveType(destStream, get);
-        })
-      ),
     };
     return {
       type: "stream",
@@ -355,7 +343,7 @@ const build = (node, create, getVar) => {
         return (get, create) => {
           const newSource = resolve(wrappedValue, get);
           if (source && source !== newSource) {
-            resolveType(wrappedDest, get)?.push(pushable(create, newSource));
+            resolveType(dest, get)?.push(pushable(create, newSource));
           }
           source = newSource;
         };
