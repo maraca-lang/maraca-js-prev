@@ -138,7 +138,9 @@ const combineDot = (get, create, big, small) => {
     if (result) return result;
   }
   if (!big.func) return nilValue;
-  if (typeof big.func === "function") return big.func(resolve(small, get));
+  if (typeof big.func === "function") {
+    return big.func(resolve(small, get), create);
+  }
   if (big.func.value) return big.func.value;
   if (big.func.mode === "=>") {
     return build(big.func.body, create, big.func.buildGetVar(small));

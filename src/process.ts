@@ -81,14 +81,14 @@ export class Stream {
         return s.value;
       };
       const creator = new Creator(queue, index);
-      if (update) update(get, creator.create);
+      if (typeof update === "function") update(get, creator.create);
       firstUpdate = false;
 
       this.update = () => {
         const prevActive = active;
         active = new Set();
         creator.reset();
-        if (update) update(get, creator.create);
+        if (typeof update === "function") update(get, creator.create);
         for (const s of prevActive) {
           if (!active.has(s)) s.removeListener(this);
         }
@@ -161,7 +161,7 @@ class StaticStream {
       (d) => disposers.push(d)
     );
     const get = (s) => s.get();
-    if (update) {
+    if (typeof update === "function") {
       update(get, (run) => new StaticStream(run));
       disposers.forEach((d) => d());
     }

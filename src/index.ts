@@ -3,7 +3,7 @@ import parse, { createNode } from "./parse";
 import process from "./process";
 import { fromJs, resolve, streamMap } from "./utils";
 
-export { fromJs, isNil, toJs } from "./utils";
+export { fromJs, isNil, print, toJs } from "./utils";
 export { default as parse } from "./parse";
 
 const parseSource = (source) => {

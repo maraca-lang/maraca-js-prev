@@ -75,7 +75,7 @@ export const fromJs = (value, deep = true) => {
       type: "block",
       values: {},
       content: [],
-      func: (arg) => value(arg),
+      func: (arg, create) => value(arg, create),
     };
   }
   if (Object.prototype.toString.call(value) === "[object Object]") {
@@ -168,14 +168,13 @@ export const sortMultiple = <T = any>(
   ) as -1 | 0 | 1;
 
 const printValue = (value) => {
-  if (!value) return "";
-  if (/^[a-zA-Z0-9]+$/.test(value)) return value;
-  return `"${value.replace(/(["\\])/g, (_, m) => `\\${m}`)}"`;
+  if (!value) return '""';
+  return `"${value.replace(/\<|\>|\[|\]|\{|\}|"/g, (m) => `\\${m}`)}"`;
 };
 const printBlock = (values, content) => {
-  const printValues = Object.keys(values).map(
-    (k) => `${printValue(k)}=${print(values[k])}`
-  );
+  const printValues = Object.keys(values)
+    .filter((k) => values[k].type === "block" || values[k].value)
+    .map((k) => `${printValue(k)}=${print(values[k])}`);
   const printContent = content.map((c) => print(c));
   return `<${[...printValues, ...printContent].join(" ")}>`;
 };
