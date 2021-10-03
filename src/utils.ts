@@ -3,12 +3,15 @@ export const keysToObject = (
   valueMap,
   keyMap = (k, _) => k,
   initial = {}
-) =>
-  keys.reduce((res, k, i) => {
+) => {
+  const res = { ...initial };
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
     const value = valueMap(k, i);
-    if (value === undefined) return res;
-    return { ...res, [keyMap(k, i)]: value };
-  }, initial);
+    if (value !== undefined) res[keyMap(k, i)] = value;
+  }
+  return res;
+};
 export const mapObject = (obj, valueMap) =>
   keysToObject(Object.keys(obj), (k) => valueMap(obj[k], k));
 
@@ -151,34 +154,29 @@ export const toJs = (data = { type: "value", value: "" } as any, config) => {
 
 export const streamMap = (map) => (set) => (get) => set(map(get));
 
-export const sortMultiple = <T = any>(
-  items1: T[],
-  items2: T[],
-  sortItems: (a: T, b: T) => number,
-  reverseUndef = false
-) =>
-  Array.from({ length: Math.max(items1.length, items2.length) }).reduce(
-    (res, _, i) => {
-      if (res !== 0) return res;
-      if (items1[i] === undefined) return reverseUndef ? 1 : -1;
-      if (items2[i] === undefined) return reverseUndef ? -1 : 1;
-      return sortItems(items1[i], items2[i]);
-    },
-    0
-  ) as -1 | 0 | 1;
-
 const printValue = (value) => {
   if (!value) return '""';
   return `"${value.replace(/\<|\>|\[|\]|\{|\}|"/g, (m) => `\\${m}`)}"`;
 };
-const printBlock = (values, content) => {
-  const printValues = Object.keys(values)
+const printBlock = (values, content, canonical?) => {
+  const keys = canonical
+    ? Object.keys(values).sort((a, b) => {
+        const aIndex = toIndex(a);
+        const bIndex = toIndex(b);
+        if (!aIndex === !bIndex) {
+          if (aIndex) return aIndex - bIndex;
+          return a.localeCompare(b);
+        }
+        return aIndex ? 1 : -1;
+      })
+    : Object.keys(values);
+  const printValues = keys
     .filter((k) => values[k].type === "block" || values[k].value)
-    .map((k) => `${printValue(k)}=${print(values[k])}`);
-  const printContent = content.map((c) => print(c));
+    .map((k) => `${printValue(k)}=${print(values[k], canonical)}`);
+  const printContent = content.map((c) => print(c, canonical));
   return `<${[...printValues, ...printContent].join(" ")}>`;
 };
-export const print = (data) => {
+export const print = (data, canonical?) => {
   if (data.type === "value") return printValue(data.value);
-  return printBlock(data.values, data.content);
+  return printBlock(data.values, data.content, canonical);
 };

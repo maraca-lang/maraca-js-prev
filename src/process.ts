@@ -1,26 +1,43 @@
-import { sortMultiple } from "./utils";
-
 const obj = {};
 
+const compare = (a, b) => {
+  const l = Math.max(a.length, b.length);
+  for (let i = 0; i < l; i++) {
+    if (a[i] === undefined) return 1;
+    if (b[i] === undefined) return -1;
+    if (a[i] !== b[i]) return a[i] - b[i];
+  }
+  return 0;
+};
+const insertSorted = (array, value) => {
+  let low = 0;
+  let high = array.length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (compare(array[mid].index, value.index) < 0) low = mid + 1;
+    else high = mid;
+  }
+  if (array[low] !== value) array.splice(low, 0, value);
+};
 class Queue {
-  private queue: Set<any> | null = null;
+  private queue: any[] | null = null;
   add(streams: Set<any>) {
     const first = !this.queue;
-    if (first) this.queue = new Set();
+    if (first) this.queue = [];
     for (const s of streams) {
-      if (s.index) this.queue!.add(s);
+      if (s.index) insertSorted(this.queue, s);
     }
     if (first) setTimeout(() => this.next());
   }
   remove(stream) {
-    if (this.queue && this.queue.has(stream)) this.queue.delete(stream);
+    if (this.queue) {
+      const i = this.queue.indexOf(stream);
+      if (i !== -1) this.queue.splice(i, 1);
+    }
   }
   next() {
-    if (this.queue && this.queue.size > 0) {
-      const next = [...this.queue].sort((a, b) =>
-        sortMultiple(a.index, b.index, (x, y) => x - y, true)
-      )[0];
-      this.queue.delete(next);
+    if (this.queue && this.queue.length > 0) {
+      const next = this.queue.shift();
       next.update();
       this.next();
     } else {
