@@ -2,6 +2,7 @@ import {
   fromJs,
   isNil,
   mapObject,
+  nilValue,
   print,
   resolve,
   resolveData,
@@ -63,8 +64,6 @@ const pushable = (create, initial) => {
         };
   return pushableValue(create, result);
 };
-
-const nilValue = { type: "value", value: "" };
 
 const getParamValue = (value, params, key) => {
   if (value.type === "value") return nilValue;

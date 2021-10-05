@@ -26,7 +26,8 @@ export const toIndex = (v: string) => {
 
 export const isNil = (d) => d.type === "value" && !d.value;
 
-const nilValue = { type: "value", value: "" };
+export const nilValue = { type: "value", value: "" };
+
 export const resolveType = (data, get) => {
   const d = data || nilValue;
   if (d.type === "stream") return resolveType(get(d.value), get);
@@ -158,25 +159,23 @@ const printValue = (value) => {
   if (!value) return '""';
   return `"${value.replace(/\<|\>|\[|\]|\{|\}|"/g, (m) => `\\${m}`)}"`;
 };
-const printBlock = (values, content, canonical?) => {
-  const keys = canonical
-    ? Object.keys(values).sort((a, b) => {
-        const aIndex = toIndex(a);
-        const bIndex = toIndex(b);
-        if (!aIndex === !bIndex) {
-          if (aIndex) return aIndex - bIndex;
-          return a.localeCompare(b);
-        }
-        return aIndex ? 1 : -1;
-      })
-    : Object.keys(values);
+const printBlock = (values, content) => {
+  const keys = Object.keys(values).sort((a, b) => {
+    const aIndex = toIndex(a);
+    const bIndex = toIndex(b);
+    if (!aIndex === !bIndex) {
+      if (aIndex) return aIndex - bIndex;
+      return a.localeCompare(b);
+    }
+    return aIndex ? 1 : -1;
+  });
   const printValues = keys
     .filter((k) => values[k].type === "block" || values[k].value)
-    .map((k) => `${printValue(k)}=${print(values[k], canonical)}`);
-  const printContent = content.map((c) => print(c, canonical));
+    .map((k) => `${printValue(k)}=${print(values[k])}`);
+  const printContent = content.map((c) => print(c));
   return `<${[...printValues, ...printContent].join(" ")}>`;
 };
-export const print = (data, canonical?) => {
+export const print = (data) => {
   if (data.type === "value") return printValue(data.value);
-  return printBlock(data.values, data.content, canonical);
+  return printBlock(data.values, data.content);
 };
