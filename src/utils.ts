@@ -33,36 +33,42 @@ export const resolveType = (data, get) => {
   if (d.type === "stream") return resolveType(get(d.value), get);
   return d;
 };
-export const resolveData = (data, get) => {
+export const resolveData = (data, get, deep = false) => {
   const d = data || nilValue;
   if (d.type === "stream") return resolveData(get(d.value), get);
   if (d.type === "block") {
-    if (d.merge) d.merge.map((s) => resolveType(s, get));
+    if (!d.merge) return d;
+    d.merge.map((s) => resolveType(s, get));
     let values = {};
-    const content = d.content.reduce((res, x) => {
-      if (!Array.isArray(x)) return [...res, x];
-      const v = resolveData(x[0], get);
-      if (v.type !== "block") return res;
-      values = { ...values, ...v.values };
-      return [...res, ...v.content];
-    }, []);
+    const content = (deep ? d.wrappedContent || d.content : d.content).reduce(
+      (res, x) => {
+        if (!Array.isArray(x)) return [...res, x];
+        const v = resolveData(x[0], get);
+        if (v.type !== "block") return res;
+        values = { ...values, ...v.values };
+        return [...res, ...v.content];
+      },
+      []
+    );
     return {
-      type: d.type,
+      ...d,
       values: { ...values, ...d.values },
       content,
-      func: d.func,
-      push: d.push,
+      merge: [],
     };
   }
   return d;
 };
 export const resolve = (data, get) => {
-  const d = resolveData(data, get);
+  const d = resolveData(data, get, true);
   if (d.type === "block") {
+    if (!d.merge) return d;
     return {
-      ...d,
+      type: d.type,
       values: mapObject(d.values, (v) => resolve(v, get)),
       content: d.content.map((c) => resolve(c, get)),
+      func: d.func,
+      push: d.push,
     };
   }
   return d;

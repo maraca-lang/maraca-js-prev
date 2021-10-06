@@ -65,6 +65,11 @@ const pushable = (create, initial) => {
   return pushableValue(create, result);
 };
 
+const wrapValue = (create, value) => ({
+  type: "stream",
+  value: create(streamMap((get) => resolve(value, get))),
+});
+
 const getParamValue = (value, params, key) => {
   if (value.type === "value") return nilValue;
   const index = params.findIndex((x) => x.key === key);
@@ -76,9 +81,9 @@ const getParamValue = (value, params, key) => {
       const content = value.content.slice(
         params.length - 1 - Object.keys(values).length
       );
-      return { type: "block", values, content };
+      return { type: "block", values, content, merge: [] };
     }
-    return { type: "block", values, content: value.content };
+    return { type: "block", values, content: value.content, merge: [] };
   }
   if (value.values[key]) return value.values[key];
   if (params.some((x) => x.rest == "**")) {
@@ -149,6 +154,12 @@ const combineDot = (get, create, big, small) => {
     return build(big.func.body, create, big.func.buildGetVar(small));
   }
   if (big.func.mode === "=>>") {
+    const content = [
+      ...big.content,
+      ...small.content.map((v, i) =>
+        build(big.func.body, create, big.func.buildGetVar(v, `${i + 1}`))
+      ),
+    ];
     return {
       type: "block",
       values: {
@@ -157,12 +168,9 @@ const combineDot = (get, create, big, small) => {
           build(big.func.body, create, big.func.buildGetVar(v, k))
         ),
       },
-      content: [
-        ...big.content,
-        ...small.content.map((v, i) =>
-          build(big.func.body, create, big.func.buildGetVar(v, `${i + 1}`))
-        ),
-      ],
+      content,
+      wrappedContent: content.map((c) => wrapValue(create, c)),
+      merge: [],
     };
   }
   return small.content.reduce(
@@ -287,7 +295,16 @@ const build = (node, create, getVar) => {
       buildFunc(items.func, create, (name) => newGetVar(name, false));
 
     if (bracket === "<") {
-      return { type: "block", values, content, func, merge };
+      return {
+        type: "block",
+        values,
+        content,
+        wrappedContent: content.map((c) =>
+          Array.isArray(c) ? [wrapValue(create, c[0])] : wrapValue(create, c)
+        ),
+        func,
+        merge,
+      };
     }
     return {
       type: "stream",
@@ -333,16 +350,13 @@ const build = (node, create, getVar) => {
     const dest = getVar(node.values.key.value);
     if (isNil(dest) && !dest.push) return nilValue;
     const value = build(node.content[0], create, getVar);
-    const wrappedValue = {
-      type: "stream",
-      value: create(streamMap((get) => resolve(value, get))),
-    };
+    const wrapped = wrapValue(create, value);
     return {
       type: "stream",
       value: create(() => {
         let source;
         return (get, create) => {
-          const newSource = resolve(wrappedValue, get);
+          const newSource = resolve(wrapped, get);
           if (source && source !== newSource) {
             resolveType(dest, get)?.push(pushable(create, newSource));
           }
@@ -388,10 +402,7 @@ const build = (node, create, getVar) => {
     };
   }
   if (type === "pipe") {
-    const wrapped = {
-      type: "stream",
-      value: create(streamMap((get) => resolve(args[0], get))),
-    };
+    const wrapped = wrapValue(create, args[0]);
     return {
       type: "stream",
       value: create((set) => {
